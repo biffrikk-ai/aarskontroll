@@ -1,0 +1,1 @@
+Se index.html for EmailJS-nøkler. Last opp hele mappen til GitHub Pages.
