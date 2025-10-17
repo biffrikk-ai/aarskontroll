@@ -319,4 +319,151 @@
 
     const CustomerDetail = ()=>{
       const inds=db.individuals.filter(i=>i.customerId===currentCustomer.id);
-      const checks=db.checks.filter(y=>inds.some(i=>i.id===y.individual
+      const checks=db.checks.filter(y=>inds.some(i=>i.id===y.individualId)).sort((a,b)=>b.date.localeCompare(a.date));
+      return e("div",{className:"grid two"},
+        e(Card,{title:"Kunde"},
+          e("div",{style:{fontWeight:800,fontSize:18}}, currentCustomer.name),
+          e("div",{className:"small"}, address(currentCustomer)),
+          e("div",{className:"small"}, `Kontakt: ${currentCustomer.contact||"-"} · ${currentCustomer.phone||"-"}`),
+          e("div",{className:"small"}, `E-post: ${currentCustomer.email||"-"} · Org.nr: ${currentCustomer.orgnr||"-"}`),
+          e("div",{className:"divider"}),
+          e(BtnSec,{onClick:()=>setView("customers")},"Tilbake")
+        ),
+        e(Card,{title:"Legg til individ"},
+          e("div",{className:"row two"},
+            e("div",null,L("Navn / betegnelse"),Input({value:ind.name,onChange:ev=>setInd({...ind,name:ev.target.value})})),
+            e("div",null,L("Serienummer"),Input({value:ind.serial,onChange:ev=>setInd({...ind,serial:ev.target.value})}))
+          ),
+          e("div",{className:"row two"},
+            e("div",null,L("Type produkt"),
+              Select({value:ind.type,onChange:ev=>setInd({...ind,type:ev.target.value})},
+                e("option",{value:""},"Velg …"),
+                ...PRODUCT_TYPES.map(t=>e("option",{key:t,value:t},t))
+              )
+            ),
+            e("div",null,L("Notater"),TextArea({rows:3,value:ind.notes,onChange:ev=>setInd({...ind,notes:ev.target.value})}))
+          ),
+          e("div",{style:{marginTop:10}}, e(Button,{onClick:addIndividual},"Lagre individ"))
+        ),
+        e(Card,{title:"Individer",style:{gridColumn:"1 / -1"}},
+          inds.length===0?e("div",{className:"small"},"Ingen individer registrert."):null,
+          e("ul",{style:{listStyle:"none",padding:0,margin:0}},
+            inds.map(i=>{
+              const last=db.checks.filter(y=>y.individualId===i.id).sort((a,b)=>b.date.localeCompare(a.date))[0];
+              return e("li",{key:i.id,className:"kundeitem"},
+                e("div",null,
+                  e("div",{style:{fontWeight:800}}, i.name),
+                  e("div",{className:"small"}, `${cleanType(i.type)} ${i.serial?`· SN: ${i.serial}`:""}`),
+                  e("div",{className:"small"}, `Sist kontroll: ${last?`${last.date} – ${last.result}`:"–"}`)
+                ),
+                e("div",{style:{display:"flex",gap:6}},
+                  e(BtnSec,{onClick:()=>{setCurrentIndividual(i); setView("reports");}},"Se rapporter"),
+                  e(Button,{onClick:()=>startChecklist(i)},"Ny årskontroll"),
+                  e(BtnSec,{onClick:()=>{const name=prompt("Navn",i.name); if(name===null)return;
+                    const type=prompt("Type",i.type); if(type===null)return;
+                    const serial=prompt("Serienummer",i.serial||""); if(serial===null)return;
+                    const notes=prompt("Notater",i.notes||""); if(notes===null)return;
+                    updateIndividual({...i,name,type,serial,notes});
+                  }},"Rediger"),
+                  e(BtnDanger,{onClick:()=>deleteIndividual(i.id)},"Slett")
+                )
+              );
+            })
+          )
+        ),
+        checks.length>0?e(Card,{title:"Siste rapporter",style:{gridColumn:"1 / -1"}},
+          ...checks.slice(0,5).map(y=>e("div",{key:y.id,className:"kundeitem"},
+            e("div",null,
+              e("div",{style:{fontWeight:700}}, `${y.date} – ${y.result}`),
+              e("div",{className:"small"}, db.individuals.find(i=>i.id===y.individualId)?.name||""),
+              y.photo?e("img",{src:y.photo,className:"thumb",alt:"Vedlagt bilde"}):null
+            ),
+            e("div",{style:{display:"flex",gap:6}},
+              e(BtnSec,{onClick:()=>exportPdf(y)},"PDF"),
+              e(BtnDanger,{onClick:()=>deleteCheck(y.id)},"Slett")
+            )
+          ))
+        ):null
+      );
+    };
+
+    const Reports = ()=>{
+      const list=db.checks.filter(c=>c.individualId===currentIndividual.id).sort((a,b)=>b.date.localeCompare(a.date));
+      return e(Card,{title:`Rapporter – ${currentIndividual.name}`},
+        list.length===0?e("div",{className:"small"},"Ingen rapporter."):null,
+        ...list.map(y=>e("div",{key:y.id,className:"kundeitem"},
+          e("div",null,
+            e("div",{style:{fontWeight:700}}, `${y.date} – ${y.result}`),
+            e("div",{className:"small"}, y.inspector||""),
+            y.photo?e("img",{src:y.photo,className:"thumb",alt:"Vedlagt bilde"}):null
+          ),
+          e("div",{style:{display:"flex",gap:6}},
+            e(BtnSec,{onClick:()=>exportPdf(y)},"PDF"),
+            e(BtnDanger,{onClick:()=>deleteCheck(y.id)},"Slett")
+          )
+        )),
+        e("div",{style:{marginTop:10}}, e(BtnSec,{onClick:()=>setView("customerDetail")},"Tilbake"))
+      );
+    };
+
+    const NewCheck = ()=>e(Card,{title:`Ny årskontroll – ${currentIndividual?currentIndividual.name:""}`},
+      e("div",{className:"row two"},
+        e("div",null,L("Dato"),Input({type:"date",value:check.date,onChange:ev=>setCheck({...check,date:ev.target.value})})),
+        e("div",null,L("Kontrollør"),Input({value:check.inspector,onChange:ev=>setCheck({...check,inspector:ev.target.value})}))
+      ),
+      e("div",{className:"row two"},
+        e("div",null,L("Resultat"),
+          Select({value:check.result,onChange:ev=>setCheck({...check,result:ev.target.value})},
+            e("option",null,"OK"), e("option",null,"Avvik")
+          )
+        ),
+        e("div",null,L("Notater"),TextArea({rows:3,value:check.notes,onChange:ev=>setCheck({...check,notes:ev.target.value})}))
+      ),
+      e("div",{className:"divider"}),
+      e("div",{style:{fontWeight:700,marginBottom:6}},"Vedlegg (valgfritt)"),
+      e("div",{style:{display:"flex",alignItems:"center",gap:10,marginBottom:10}},
+        e("input",{type:"file",accept:"image/*",onChange:async ev=>{const f=ev.target.files&&ev.target.files[0]; if(!f)return; const data=await readFileAsDataURL(f); setPhoto(data);}}),
+        photo?e("img",{src:photo,className:"thumb",alt:"Vedlegg"}):null
+      ),
+      e("div",{className:"divider"}),
+      e("div",{style:{fontWeight:700,marginBottom:6}},"Sjekkliste"),
+      ...items.map((it,idx)=>e("div",{key:it.key,className:"kundeitem",style:{alignItems:"flex-start"}},
+        e("div",{style:{flex:1}},
+          e("div",{className:"small",style:{fontWeight:700}}, it.label),
+          Input({style:{marginTop:8},placeholder:"Notat (valgfritt)",value:it.notes,onChange:ev=>setItems(p=>p.map((q,i)=>i===idx?{...q,notes:ev.target.value}:q))})
+        ),
+        Select({style:{width:120},value:it.status,onChange:ev=>setItems(p=>p.map((q,i)=>i===idx?{...q,status:ev.target.value}:q))},
+          e("option",null,"OK"), e("option",null,"Avvik"), e("option",null,"NA")
+        )
+      )),
+      e("div",{style:{display:"flex",gap:8,marginTop:10}},
+        e(BtnSec,{onClick:()=>setView("customerDetail")},"Avbryt"),
+        e(Button,{onClick:saveCheck},"Lagre kontroll")
+      )
+    );
+
+    // router (enkel state-basert)
+    function Root(){
+      const [v,setV]=React.useState("customers");
+      const [custSel,setCustSel]=React.useState(null);
+      const [indSel,setIndSel]=React.useState(null);
+
+      // Sync med ytre state (for enkelhet binder vi direkte)
+      React.useEffect(()=>{
+        setV(view); setCustSel(currentCustomer); setIndSel(currentIndividual);
+      },[view,currentCustomer,currentIndividual]);
+
+      return e(React.Fragment,null,
+        v==="customers" && e(Customers),
+        v==="customerDetail" && custSel && e(CustomerDetail),
+        v==="reports" && indSel && e(Reports),
+        v==="newCheck" && indSel && e(NewCheck)
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(e(Root));
+  }
+
+  // start
+  App();
+})();
