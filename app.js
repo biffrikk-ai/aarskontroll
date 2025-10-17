@@ -1,18 +1,18 @@
-
 (function(){
   const React = window.React, ReactDOM = window.ReactDOM;
   const { jsPDF } = window.jspdf;
+  const e = React.createElement;
 
   // --- Helpers
-  const LS = 'aarskontroll_store_v19';
+  const LS = 'aarskontroll_store_v20';
   const load = () => { try { return JSON.parse(localStorage.getItem(LS)||'{}'); } catch { return {}; } };
-  const save = (s) => localStorage.setItem(LS, JSON.stringify(s));
+  const debouncedSave = (()=>{ let t=null; return (state)=>{ clearTimeout(t); t=setTimeout(()=>localStorage.setItem(LS, JSON.stringify(state)), 400); }; })();
   const uid = () => Math.random().toString(36).slice(2)+Date.now().toString(36);
   const today = () => new Date().toISOString().slice(0,10);
   const cleanType = (t='') => String(t).replace(/EN\s*\d+(\s*\/\s*EN\d+)*/gi,'').replace(/[–-]\s*/g,'').trim();
-  function readFileAsDataURL(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(file); }); }
+  const readFileAsDataURL = (file)=> new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(file); });
 
-  // --- Predefined checklists per type (from previous spec)
+  // --- Forhåndsdefinerte sjekklister (EN-typer)
   const CHECKLISTS = {
     'EN361 / EN358 / EN813 – Sele': [
       'Merkelapp/ID lesbar og samsvarer med standard',
@@ -91,11 +91,11 @@
       'Kroker/karabiner intakte og funksjonelle',
       'Lengde samsvarer med spesifikasjon',
       'Kontrolldato oppdatert'
-    ],
+    ]
   };
+  const PRODUCT_TYPES = Object.keys(CHECKLISTS);
 
-  // Small components helpers
-  const e = React.createElement;
+  // Small components
   const Button = (props)=> e('button', Object.assign({className:'btn'}, props), props.children);
   const BtnSec = (props)=> e('button', Object.assign({className:'btn secondary'}, props), props.children);
   const BtnDanger = (props)=> e('button', Object.assign({className:'btn danger'}, props), props.children);
@@ -107,12 +107,13 @@
 
   function App(){
     const [db, setDb] = React.useState(()=>({customers:[], individuals:[], checks:[], items:[], ...load()}));
-    React.useEffect(()=>save(db),[db]);
+    React.useEffect(()=>debouncedSave(db),[db]); // debounced => stabilt tastatur på mobil
 
     const [view, setView] = React.useState('customers');
     const [currentCustomer, setCurrentCustomer] = React.useState(null);
     const [currentIndividual, setCurrentIndividual] = React.useState(null);
 
+    // Lokale skjemastater (unngår store re-renders ved tastetrykk)
     const [cust, setCust] = React.useState({name:'',contact:'',phone:'',email:'',orgnr:'',street:'',zip:'',city:''});
     const [ind, setInd] = React.useState({name:'',type:'',serial:'',notes:''});
     const [check, setCheck] = React.useState({date:today(),inspector:'',result:'OK',notes:''});
@@ -217,8 +218,7 @@
       if (y.notes) { doc.text('Notater:', margin, yPos); yPos+=16; doc.text(y.notes, margin, yPos); yPos+=18; }
 
       if (y.photo) {
-        try {
-          const fmt = y.photo.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+        try { const fmt = y.photo.startsWith('data:image/png') ? 'PNG' : 'JPEG';
           const imgW = 400; const imgH = 260;
           doc.text('Bilde:', margin, yPos); yPos+=10;
           doc.addImage(y.photo, fmt, margin, yPos, imgW, imgH, undefined, 'FAST');
@@ -245,7 +245,12 @@
         yPos+=28;
       });
       const footerY = pageH-60; doc.setDrawColor(200); doc.line(margin,footerY,pageW-margin,footerY);
-      const f = ['Petersson Industri og Service','Smed Qvales vei 19b, 8012 Bodø','Tlf: +47 911 28 084 – E‑post: bjorn.petersson@outlook.com','Org.nr: 933 939 871 MVA'];
+      const f = [
+        'Petersson Industri og Service',
+        'Smed Qvales vei 19b, 8012 Bodø',
+        'Tlf: +47 911 28 084 – E-post: bjorn.petersson@outlook.com',
+        'Org.nr: 933 939 871 MVA'
+      ];
       let fy = footerY+14; f.forEach(t=>{doc.text(t, margin, fy); fy+=14;});
       const blob = doc.output('blob');
       const filename = `aarskontroll_${(cust.name||'kunde').replace(/[^a-z0-9]+/gi,'-').toLowerCase()}_${(indiv.name||'individ').replace(/[^a-z0-9]+/gi,'-').toLowerCase()}_${y.date.replace(/-/g,'')}.pdf`;
@@ -255,13 +260,13 @@
       } else {
         doc.save(filename);
         const subject = encodeURIComponent(`Årskontroll – ${cust.name||''} – ${y.date}`);
-        const body = encodeURIComponent('Hei,\\n\\nSe vedlagt rapport.\\n\\nMvh\\nPetersson Industri og Service');
+        const body = encodeURIComponent('Hei,\n\nSe vedlagt rapport.\n\nMvh\nPetersson Industri og Service');
         const to = encodeURIComponent(cust.email||'');
         window.location.href = `mailto:${to}?subject=${subject}&body=${body}`;
       }
     };
 
-    // UI building blocks
+    // UI helpers
     const L = (txt)=> e('div',{className:'label'},txt);
     const Input = (props)=> e('input', Object.assign({className:'input'}, props));
     const TextArea = (props)=> e('textarea', Object.assign({className:'input'}, props));
@@ -290,7 +295,7 @@
                 const name=prompt('Kundenavn', c.name); if(name===null)return;
                 const contact=prompt('Kontaktperson', c.contact||''); if(contact===null)return;
                 const phone=prompt('Telefon', c.phone||''); if(phone===null)return;
-                const email=prompt('E‑post', c.email||''); if(email===null)return;
+                const email=prompt('E-post', c.email||''); if(email===null)return;
                 const orgnr=prompt('Org.nr', c.orgnr||''); if(orgnr===null)return;
                 const street=prompt('Gateadresse', c.street||''); if(street===null)return;
                 const zip=prompt('Postnr', c.zip||''); if(zip===null)return;
@@ -304,18 +309,18 @@
       ),
       e(Card,{title:'Ny kunde'},
         e('div',{className:'row three'},
-          e('div',null, L('Kundenavn'), Input({value:cust.name,onChange:e=>setCust({...cust,name:e.target.value})})),
-          e('div',null, L('Kontaktperson'), Input({value:cust.contact,onChange:e=>setCust({...cust,contact:e.target.value})})),
-          e('div',null, L('Telefon'), Input({value:cust.phone,onChange:e=>setCust({...cust,phone:e.target.value})}))
+          e('div',null, L('Kundenavn'), Input({value:cust.name,onInput:e=>setCust({...cust,name:e.target.value})})),
+          e('div',null, L('Kontaktperson'), Input({value:cust.contact,onInput:e=>setCust({...cust,contact:e.target.value})})),
+          e('div',null, L('Telefon'), Input({value:cust.phone,onInput:e=>setCust({...cust,phone:e.target.value})}))
         ),
         e('div',{className:'row three'},
-          e('div',null, L('E‑post'), Input({value:cust.email,onChange:e=>setCust({...cust,email:e.target.value})})),
-          e('div',null, L('Org.nr'), Input({value:cust.orgnr,onChange:e=>setCust({...cust,orgnr:e.target.value})}))
+          e('div',null, L('E-post'), Input({value:cust.email,onInput:e=>setCust({...cust,email:e.target.value})})),
+          e('div',null, L('Org.nr'), Input({value:cust.orgnr,onInput:e=>setCust({...cust,orgnr:e.target.value})}))
         ),
         e('div',{className:'row three'},
-          e('div',null, L('Gateadresse'), Input({value:cust.street,onChange:e=>setCust({...cust,street:e.target.value})})),
-          e('div',null, L('Postnr'), Input({value:cust.zip,onChange:e=>setCust({...cust,zip:e.target.value})})),
-          e('div',null, L('Poststed'), Input({value:cust.city,onChange:e=>setCust({...cust,city:e.target.value})}))
+          e('div',null, L('Gateadresse'), Input({value:cust.street,onInput:e=>setCust({...cust,street:e.target.value})})),
+          e('div',null, L('Postnr'), Input({value:cust.zip,onInput:e=>setCust({...cust,zip:e.target.value})})),
+          e('div',null, L('Poststed'), Input({value:cust.city,onInput:e=>setCust({...cust,city:e.target.value})}))
         ),
         e('div',{style:{marginTop:10}}, e(Button,{onClick:addCustomer},'Lagre kunde'))
       )
@@ -329,23 +334,23 @@
           e('div',{style:{fontWeight:800,fontSize:18}}, currentCustomer.name),
           e('div',{className:'small'}, address(currentCustomer)),
           e('div',{className:'small'}, `Kontakt: ${currentCustomer.contact||'-'} · ${currentCustomer.phone||'-'}`),
-          e('div',{className:'small'}, `E‑post: ${currentCustomer.email||'-'} · Org.nr: ${currentCustomer.orgnr||'-'}`),
+          e('div',{className:'small'}, `E-post: ${currentCustomer.email||'-'} · Org.nr: ${currentCustomer.orgnr||'-'}`),
           e('div',{className:'divider'}),
           e(BtnSec,{onClick:()=>setView('customers')},'Tilbake')
         ),
         e(Card,{title:'Legg til individ'},
           e('div',{className:'row two'},
-            e('div',null, L('Navn / betegnelse'), Input({value:ind.name,onChange:e=>setInd({...ind,name:e.target.value})})),
-            e('div',null, L('Serienummer'), Input({value:ind.serial,onChange:e=>setInd({...ind,serial:e.target.value})}))
+            e('div',null, L('Navn / betegnelse'), Input({value:ind.name,onInput:e=>setInd({...ind,name:e.target.value})})),
+            e('div',null, L('Serienummer'), Input({value:ind.serial,onInput:e=>setInd({...ind,serial:e.target.value})}))
           ),
           e('div',{className:'row two'},
             e('div',null, L('Type produkt'),
-              Select({value:ind.type,onChange:e=>setInd({...ind,type:e.target.value})},
+              e(Select,{value:ind.type,onInput:e=>setInd({...ind,type:e.target.value})},
                 e('option',{value:''},'Velg …'),
-                ...Object.keys(CHECKLISTS).map(t=>e('option',{key:t,value:t},t))
+                ...PRODUCT_TYPES.map(t=>e('option',{key:t,value:t},t))
               )
             ),
-            e('div',null, L('Notater'), e(TextArea,{rows:3,value:ind.notes,onChange:e=>setInd({...ind,notes:e.target.value})}))
+            e('div',null, L('Notater'), e(TextArea,{rows:3,value:ind.notes,onInput:e=>setInd({...ind,notes:e.target.value})}))
           ),
           e('div',{style:{marginTop:10}}, e(Button,{onClick:addIndividual},'Lagre individ'))
         ),
@@ -408,7 +413,7 @@
             e('div',{className:'small'}, y.inspector || ''),
             y.photo ? e('img',{src:y.photo,className:'thumb',alt:'Vedlagt bilde'}) : null
           ),
-          e('div',{style:{display:'flex',gap:6}},
+          e('div',{style:{display:'flex',gap:6}} ,
             e(BtnSec,{onClick:()=>exportPdf(y)},'PDF'),
             e(BtnDanger,{onClick:()=>deleteCheck(y.id)},'Slett')
           )
@@ -419,16 +424,17 @@
 
     const NewCheck = ()=> e(Card,{title:`Ny årskontroll – ${currentIndividual? currentIndividual.name:''}`},
       e('div',{className:'row two'},
-        e('div',null, L('Dato'), e(Input,{type:'date',value:check.date,onChange:ev=>setCheck({...check,date:ev.target.value})})),
-        e('div',null, L('Kontrollør'), e(Input,{value:check.inspector,onChange:ev=>setCheck({...check,inspector:ev.target.value})}))
+        e('div',null, e('div',{className:'label'},'Dato'), e(Input({type:'date',value:check.date,onInput:ev=>setCheck({...check,date:ev.target.value})}))),
+        e('div',null, e('div',{className:'label'},'Kontrollør'), e(Input({value:check.inspector,onInput:ev=>setCheck({...check,inspector:ev.target.value})})))
       ),
       e('div',{className:'row two'},
-        e('div',null, L('Resultat'),
-          e(Select,{value:check.result,onChange:ev=>setCheck({...check,result:ev.target.value})},
-            e('option',null,'OK'), e('option',null,'Avvik')
+        e('div',null, e('div',{className:'label'},'Resultat'),
+          e(Select({value:check.result,onInput:ev=>setCheck({...check,result:ev.target.value})}},
+            e('option',null,'OK'),
+            e('option',null,'Avvik')
           )
-        ),
-        e('div',null, L('Notater'), e(TextArea,{rows:3,value:check.notes,onChange:ev=>setCheck({...check,notes:ev.target.value})}))
+        )),
+        e('div',null, e('div',{className:'label'},'Notater'), e(TextArea({rows:3,value:check.notes,onInput:ev=>setCheck({...check,notes:ev.target.value})})))
       ),
       e('div',{className:'divider'}),
       e('div',{style:{fontWeight:700,marginBottom:6}},'Vedlegg (valgfritt)'),
@@ -441,9 +447,9 @@
       ...items.map((it,idx)=> e('div',{key:it.key,className:'kundeitem',style:{alignItems:'flex-start'}},
         e('div',{style:{flex:1}},
           e('div',{className:'small',style:{fontWeight:700}}, it.label),
-          e(Input,{style:{marginTop:8},placeholder:'Notat (valgfritt)',value:it.notes,onChange:ev=>setItems(prev=>prev.map((p,i)=>i===idx?Object.assign({},p,{notes:ev.target.value}):p))})
+          e(Input({style:{marginTop:8},placeholder:'Notat (valgfritt)',value:it.notes,onInput:ev=>setItems(prev=>prev.map((p,i)=>i===idx?Object.assign({},p,{notes:ev.target.value}):p))}))
         ),
-        e(Select,{style:{width:120},value:it.status,onChange:ev=>setItems(prev=>prev.map((p,i)=>i===idx?Object.assign({},p,{status:ev.target.value}):p))},
+        e(Select({style:{width:120},value:it.status,onInput:ev=>setItems(prev=>prev.map((p,i)=>i===idx?Object.assign({},p,{status:ev.target.value}):p))}},
           e('option',null,'OK'), e('option',null,'Avvik'), e('option',null,'NA')
         )
       )),
