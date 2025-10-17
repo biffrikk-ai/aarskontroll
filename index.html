@@ -3,33 +3,48 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Årskontroll – PWA</title>
-  <link rel="manifest" href="manifest.webmanifest"/>
-  <meta name="theme-color" content="#5aa8ff"/>
+  <title>Årskontroll – Web</title>
   <link rel="stylesheet" href="styles.css"/>
 </head>
 <body>
   <div class="container">
     <div class="appbar headerbar">
-      <img src="./icons/icon-192.png" alt="" width="28" height="28" style="border-radius:8px"/>
-      <h1>Årskontroll – PWA</h1>
+      <h1>Årskontroll – Web</h1>
       <div style="flex:1"></div>
     </div>
     <div id="root"></div>
   </div>
 
-  <!-- React (UMD) + jsPDF (ingen Babel nødvendig) -->
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-
-  <script src="app.js"></script>
+  <!-- Robust skriptlasting: React -> ReactDOM -> jsPDF -> app.js -->
   <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./service-worker.js').catch(console.error);
-      });
+    function addScript(src, onload, onerror){
+      var s=document.createElement('script'); s.src=src; s.defer=true; s.onload=onload;
+      s.onerror=function(){ console.error('Feil ved lasting:', src); if(onerror) onerror(); };
+      document.head.appendChild(s);
     }
+    addScript("https://unpkg.com/react@18/umd/react.production.min.js", function(){
+      addScript("https://unpkg.com/react-dom@18/umd/react-dom.production.min.js", function(){
+        addScript("https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js", function(){
+          addScript("./app.js");
+        });
+      }, function(){
+        // fallback til jsDelivr for ReactDOM
+        addScript("https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js", function(){
+          addScript("https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js", function(){
+            addScript("./app.js");
+          });
+        });
+      });
+    }, function(){
+      // fallback til jsDelivr for React
+      addScript("https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js", function(){
+        addScript("https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js", function(){
+          addScript("https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js", function(){
+            addScript("./app.js");
+          });
+        });
+      });
+    });
   </script>
 </body>
 </html>
