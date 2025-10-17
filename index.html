@@ -3,22 +3,22 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Årskontroll – Web2</title>
+  <title>Årskontroll – Web</title>
   <link rel="stylesheet" href="styles.css"/>
 </head>
 <body>
   <div class="container">
     <div class="appbar headerbar">
-      <h1>Årskontroll – Web2</h1>
+      <h1>Årskontroll – Web3</h1>
       <div style="flex:1"></div>
     </div>
     <div id="root"></div>
   </div>
 
-  <!-- Last UMD-bibliotekene i riktig rekkefølge -->
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-<script src="./app.js"></script>
+  <!-- Riktig rekkefølge + defer (trygt i Pages) -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" defer></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" defer></script>
+  <script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js" defer></script>
+  <script src="./app.js" defer></script>
 </body>
 </html>
