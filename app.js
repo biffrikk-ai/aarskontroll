@@ -3,7 +3,7 @@
   const { jsPDF } = window.jspdf;
   const e = React.createElement;
 
-  // --- Helpers
+  // Helpers
   const LS = 'aarskontroll_store_v20';
   const load = () => { try { return JSON.parse(localStorage.getItem(LS)||'{}'); } catch { return {}; } };
   const debouncedSave = (()=>{ let t=null; return (state)=>{ clearTimeout(t); t=setTimeout(()=>localStorage.setItem(LS, JSON.stringify(state)), 400); }; })();
@@ -12,7 +12,7 @@
   const cleanType = (t='') => String(t).replace(/EN\s*\d+(\s*\/\s*EN\d+)*/gi,'').replace(/[–-]\s*/g,'').trim();
   const readFileAsDataURL = (file)=> new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(file); });
 
-  // --- Forhåndsdefinerte sjekklister (EN-typer)
+  // Forhåndsdefinerte sjekklister
   const CHECKLISTS = {
     'EN361 / EN358 / EN813 – Sele': [
       'Merkelapp/ID lesbar og samsvarer med standard',
@@ -95,7 +95,7 @@
   };
   const PRODUCT_TYPES = Object.keys(CHECKLISTS);
 
-  // Small components
+  // UI helpers
   const Button = (props)=> e('button', Object.assign({className:'btn'}, props), props.children);
   const BtnSec = (props)=> e('button', Object.assign({className:'btn secondary'}, props), props.children);
   const BtnDanger = (props)=> e('button', Object.assign({className:'btn danger'}, props), props.children);
@@ -104,16 +104,20 @@
     children,
     actions? e('div',{style:{marginTop:8,display:'flex',gap:8,flexWrap:'wrap'}}, actions): null
   );
+  const L = (txt)=> e('div',{className:'label'},txt);
+  const Input = (props)=> e('input', Object.assign({className:'input'}, props));
+  const TextArea = (props)=> e('textarea', Object.assign({className:'input'}, props));
+  const Select = (props)=> e('select', Object.assign({className:'input'}, props));
 
   function App(){
     const [db, setDb] = React.useState(()=>({customers:[], individuals:[], checks:[], items:[], ...load()}));
-    React.useEffect(()=>debouncedSave(db),[db]); // debounced => stabilt tastatur på mobil
+    React.useEffect(()=>debouncedSave(db),[db]); // stabiliserer input på mobil
 
     const [view, setView] = React.useState('customers');
     const [currentCustomer, setCurrentCustomer] = React.useState(null);
     const [currentIndividual, setCurrentIndividual] = React.useState(null);
 
-    // Lokale skjemastater (unngår store re-renders ved tastetrykk)
+    // Skjemastate (lokal)
     const [cust, setCust] = React.useState({name:'',contact:'',phone:'',email:'',orgnr:'',street:'',zip:'',city:''});
     const [ind, setInd] = React.useState({name:'',type:'',serial:'',notes:''});
     const [check, setCheck] = React.useState({date:today(),inspector:'',result:'OK',notes:''});
@@ -138,7 +142,7 @@
       } catch (e) { alert('Kunne ikke importere: ' + e.message); }
     };
 
-    // CRUD Customers
+    // Customers
     const addCustomer = () => {
       if (!cust.name.trim()) return alert('Kundenavn må fylles ut');
       const c = { id: uid(), ...cust };
@@ -160,7 +164,7 @@
       setCurrentCustomer(null); setView('customers');
     };
 
-    // CRUD Individuals
+    // Individuals
     const addIndividual = () => {
       if (!currentCustomer) return alert('Velg kunde');
       if (!ind.name.trim()) return alert('Navn må fylles ut');
@@ -266,12 +270,6 @@
       }
     };
 
-    // UI helpers
-    const L = (txt)=> e('div',{className:'label'},txt);
-    const Input = (props)=> e('input', Object.assign({className:'input'}, props));
-    const TextArea = (props)=> e('textarea', Object.assign({className:'input'}, props));
-    const Select = (props)=> e('select', Object.assign({className:'input'}, props));
-
     // Views
     const Customers = ()=> e('div',{className:'grid two'},
       e(Card,{title:'Kunder'},
@@ -287,7 +285,7 @@
           db.customers.map(c => e('li',{key:c.id,className:'kundeitem'},
             e('div',{onClick:()=>{setCurrentCustomer(c); setView('customerDetail');}, style:{cursor:'pointer'}},
               e('div',{style:{fontWeight:800}},c.name),
-              e('div',{className:'small'}, address(c)),
+              e('div',{className:'small'}, [c.street,[c.zip,c.city].filter(Boolean).join(' ')].filter(Boolean).join(', ')),
               e('div',{className:'small'}, `Kontakt: ${c.contact||'-'} · ${c.phone||'-'}`)
             ),
             e('div',{style:{display:'flex',gap:6}},
@@ -300,7 +298,7 @@
                 const street=prompt('Gateadresse', c.street||''); if(street===null)return;
                 const zip=prompt('Postnr', c.zip||''); if(zip===null)return;
                 const city=prompt('Poststed', c.city||''); if(city===null)return;
-                updateCustomer({...c,name,contact,phone,email,orgnr,street,zip,city});
+                setDb(s=>({...s, customers: s.customers.map(x=>x.id===c.id?{...c,name,contact,phone,email,orgnr,street,zip,city}:x)}));
               }},'Rediger'),
               e(BtnDanger,{onClick:()=>deleteCustomer(c.id)},'Slett')
             )
@@ -332,7 +330,7 @@
       return e('div',{className:'grid two'},
         e(Card,{title:'Kunde'},
           e('div',{style:{fontWeight:800,fontSize:18}}, currentCustomer.name),
-          e('div',{className:'small'}, address(currentCustomer)),
+          e('div',{className:'small'}, [currentCustomer.street,[currentCustomer.zip,currentCustomer.city].filter(Boolean).join(' ')].filter(Boolean).join(', ')),
           e('div',{className:'small'}, `Kontakt: ${currentCustomer.contact||'-'} · ${currentCustomer.phone||'-'}`),
           e('div',{className:'small'}, `E-post: ${currentCustomer.email||'-'} · Org.nr: ${currentCustomer.orgnr||'-'}`),
           e('div',{className:'divider'}),
@@ -350,32 +348,32 @@
                 ...PRODUCT_TYPES.map(t=>e('option',{key:t,value:t},t))
               )
             ),
-            e('div',null, L('Notater'), e(TextArea,{rows:3,value:ind.notes,onInput:e=>setInd({...ind,notes:e.target.value})}))
+            e('div',null, L('Notater'), TextArea({rows:3,value:ind.notes,onInput:e=>setInd({...ind,notes:e.target.value})}))
           ),
-          e('div',{style:{marginTop:10}}, e(Button,{onClick:addIndividual},'Lagre individ'))
+          e('div',{style:{marginTop:10}}, Button({onClick:addIndividual},'Lagre individ'))
         ),
         e(Card,{title:'Individer', style:{gridColumn:'1 / -1'}},
           inds.length===0? e('div',{className:'small'},'Ingen individer registrert.'): null,
           e('ul',{style:{listStyle:'none',padding:0,margin:0}},
             inds.map(i=>{
               const last = db.checks.filter(y=>y.individualId===i.id).sort((a,b)=>b.date.localeCompare(a.date))[0];
-              return e('li',{key:i.id,className:'kundeitem',style:{alignItems:'flex-start'}},
+              return e('li',{key:i.id,className:'kundeitem'},
                 e('div',null,
                   e('div',{style:{fontWeight:800}}, i.name),
                   e('div',{className:'small'}, `${cleanType(i.type)} ${i.serial?`· SN: ${i.serial}`:''}`),
                   e('div',{className:'small'}, `Sist kontroll: ${last?`${last.date} – ${last.result}`:'–'}`)
                 ),
                 e('div',{style:{display:'flex',gap:6}},
-                  e(BtnSec,{onClick:()=>{ setCurrentIndividual(i); setView('reports'); }},'Se rapporter'),
-                  e(Button,{onClick:()=>startChecklist(i)},'Ny årskontroll'),
-                  e(BtnSec,{onClick:()=>{
+                  BtnSec({onClick:()=>{ setCurrentIndividual(i); setView('reports'); }},'Se rapporter'),
+                  Button({onClick:()=>startChecklist(i)},'Ny årskontroll'),
+                  BtnSec({onClick:()=>{
                     const name=prompt('Navn', i.name); if(name===null)return;
                     const type=prompt('Type', i.type); if(type===null)return;
                     const serial=prompt('Serienummer', i.serial||''); if(serial===null)return;
                     const notes=prompt('Notater', i.notes||''); if(notes===null)return;
-                    updateIndividual({...i,name,type,serial,notes});
+                    setDb(s=>({...s, individuals: s.individuals.map(x=>x.id===i.id?{...i,name,type,serial,notes}:x)}));
                   }},'Rediger'),
-                  e(BtnDanger,{onClick:()=>deleteIndividual(i.id)},'Slett')
+                  BtnDanger({onClick:()=>deleteIndividual(i.id)},'Slett')
                 )
               );
             })
@@ -389,14 +387,14 @@
               y.photo ? e('img',{src:y.photo, className:'thumb', alt:'Vedlagt bilde'}) : null
             ),
             e('div',{style:{display:'flex',gap:6}},
-              e(BtnSec,{onClick:()=>{
+              BtnSec({onClick:()=>{
                 const inspector=prompt('Kontrollør', y.inspector||''); if(inspector===null)return;
                 const result=prompt('Resultat (OK/Avvik)', y.result||'OK'); if(result===null)return;
                 const notes=prompt('Notater', y.notes||''); if(notes===null)return;
                 setDb(s=>({...s, checks: s.checks.map(c=>c.id===y.id?{...c,inspector,result,notes}:c)}));
               }},'Rediger'),
-              e(BtnSec,{onClick:()=>exportPdf(y)},'PDF'),
-              e(BtnDanger,{onClick:()=>deleteCheck(y.id)},'Slett')
+              BtnSec({onClick:()=>exportPdf(y)},'PDF'),
+              BtnDanger({onClick:()=>deleteCheck(y.id)},'Slett')
             )
           ))
         ): null
@@ -405,7 +403,7 @@
 
     const Reports = ()=>{
       const list = db.checks.filter(c=>c.individualId===currentIndividual.id).sort((a,b)=>b.date.localeCompare(a.date));
-      return e(Card,{title:`Rapporter – ${currentIndividual.name}`},
+      return Card({title:`Rapporter – ${currentIndividual.name}`},
         list.length===0? e('div',{className:'small'},'Ingen rapporter.'): null,
         ...list.map(y=> e('div',{key:y.id,className:'kundeitem'},
           e('div',null,
@@ -414,27 +412,27 @@
             y.photo ? e('img',{src:y.photo,className:'thumb',alt:'Vedlagt bilde'}) : null
           ),
           e('div',{style:{display:'flex',gap:6}} ,
-            e(BtnSec,{onClick:()=>exportPdf(y)},'PDF'),
-            e(BtnDanger,{onClick:()=>deleteCheck(y.id)},'Slett')
+            BtnSec({onClick:()=>exportPdf(y)},'PDF'),
+            BtnDanger({onClick:()=>deleteCheck(y.id)},'Slett')
           )
         )),
-        e('div',{style:{marginTop:10}}, e(BtnSec,{onClick:()=>setView('customerDetail')},'Tilbake'))
+        e('div',{style:{marginTop:10}}, BtnSec({onClick:()=>setView('customerDetail')},'Tilbake'))
       );
     };
 
-    const NewCheck = ()=> e(Card,{title:`Ny årskontroll – ${currentIndividual? currentIndividual.name:''}`},
+    const NewCheck = ()=> Card({title:`Ny årskontroll – ${currentIndividual? currentIndividual.name:''}`},
       e('div',{className:'row two'},
-        e('div',null, e('div',{className:'label'},'Dato'), e(Input({type:'date',value:check.date,onInput:ev=>setCheck({...check,date:ev.target.value})}))),
-        e('div',null, e('div',{className:'label'},'Kontrollør'), e(Input({value:check.inspector,onInput:ev=>setCheck({...check,inspector:ev.target.value})})))
+        e('div',null, L('Dato'), Input({type:'date',value:check.date,onInput:ev=>setCheck({...check,date:ev.target.value})})),
+        e('div',null, L('Kontrollør'), Input({value:check.inspector,onInput:ev=>setCheck({...check,inspector:ev.target.value})}))
       ),
       e('div',{className:'row two'},
-        e('div',null, e('div',{className:'label'},'Resultat'),
-          e(Select({value:check.result,onInput:ev=>setCheck({...check,result:ev.target.value})}},
+        e('div',null, L('Resultat'),
+          Select({value:check.result,onInput:ev=>setCheck({...check,result:ev.target.value})}},
             e('option',null,'OK'),
             e('option',null,'Avvik')
           )
-        )),
-        e('div',null, e('div',{className:'label'},'Notater'), e(TextArea({rows:3,value:check.notes,onInput:ev=>setCheck({...check,notes:ev.target.value})})))
+        ),
+        e('div',null, L('Notater'), TextArea({rows:3,value:check.notes,onInput:ev=>setCheck({...check,notes:ev.target.value})}))
       ),
       e('div',{className:'divider'}),
       e('div',{style:{fontWeight:700,marginBottom:6}},'Vedlegg (valgfritt)'),
@@ -444,18 +442,18 @@
       ),
       e('div',{className:'divider'}),
       e('div',{style:{fontWeight:700,marginBottom:6}},'Sjekkliste'),
-      ...items.map((it,idx)=> e('div',{key:it.key,className:'kundeitem',style:{alignItems:'flex-start'}},
+      ...items.map((it,idx)=> e('div',{key:it.key,className:'kundeitem'},
         e('div',{style:{flex:1}},
           e('div',{className:'small',style:{fontWeight:700}}, it.label),
-          e(Input({style:{marginTop:8},placeholder:'Notat (valgfritt)',value:it.notes,onInput:ev=>setItems(prev=>prev.map((p,i)=>i===idx?Object.assign({},p,{notes:ev.target.value}):p))}))
+          Input({style:{marginTop:8},placeholder:'Notat (valgfritt)',value:it.notes,onInput:ev=>setItems(prev=>prev.map((p,i)=>i===idx?Object.assign({},p,{notes:ev.target.value}):p))})
         ),
-        e(Select({style:{width:120},value:it.status,onInput:ev=>setItems(prev=>prev.map((p,i)=>i===idx?Object.assign({},p,{status:ev.target.value}):p))}},
+        Select({style:{width:120},value:it.status,onInput:ev=>setItems(prev=>prev.map((p,i)=>i===idx?Object.assign({},p,{status:ev.target.value}):p))}},
           e('option',null,'OK'), e('option',null,'Avvik'), e('option',null,'NA')
         )
       )),
       e('div',{style:{display:'flex',gap:8,marginTop:10}},
-        e(BtnSec,{onClick:()=>setView('customerDetail')},'Avbryt'),
-        e(Button,{onClick:saveCheck},'Lagre kontroll')
+        BtnSec({onClick:()=>setView('customerDetail')},'Avbryt'),
+        Button({onClick:saveCheck},'Lagre kontroll')
       )
     );
 
@@ -469,4 +467,3 @@
 
   ReactDOM.createRoot(document.getElementById('root')).render(e(App));
 })();
-
