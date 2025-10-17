@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Årskontroll – PWA v2.0</title>
+  <title>Årskontroll – PWA</title>
   <link rel="manifest" href="manifest.webmanifest"/>
   <meta name="theme-color" content="#5aa8ff"/>
   <link rel="stylesheet" href="styles.css"/>
@@ -12,17 +12,24 @@
   <div class="container">
     <div class="appbar headerbar">
       <img src="./icons/icon-192.png" alt="" width="28" height="28" style="border-radius:8px"/>
-      <h1>Årskontroll – PWA v2.0</h1>
+      <h1>Årskontroll – PWA</h1>
       <div style="flex:1"></div>
     </div>
     <div id="root"></div>
   </div>
 
-  <!-- React (UMD, ingen Babel), jsPDF -->
+  <!-- React (UMD) + jsPDF (ingen Babel nødvendig) -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
   <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js').catch(console.error);
+      });
+    }
+  </script>
 </body>
 </html>
