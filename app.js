@@ -1,3 +1,5 @@
+console.log('BOOT', !!window.React, !!window.ReactDOM, !!window.jspdf);
+
 try {
 (function () {
   const React = window.React, ReactDOM = window.ReactDOM;
