@@ -1,3 +1,4 @@
+try {
 (function () {
   const React = window.React, ReactDOM = window.ReactDOM;
   const { jsPDF } = window.jspdf;
@@ -221,7 +222,7 @@
       setDb(s => ({ ...s, checks: s.checks.filter(y => y.id !== id), items: s.items.filter(i => i.yearcheckId !== id) }));
     };
 
-    // PDF
+    // PDF (med rød rad ved avvik + footer m/firma)
     const exportPdf = (y) => {
       const doc = new jsPDF({ unit: "pt", format: "a4" });
       const margin = 40, pageW = doc.internal.pageSize.getWidth(), pageH = doc.internal.pageSize.getHeight();
@@ -238,8 +239,7 @@
       if (y.notes) { doc.text("Notater:", margin, yPos); yPos += 16; doc.text(y.notes, margin, yPos); yPos += 18; }
 
       if (y.photo) {
-        try {
-          const fmt = y.photo.startsWith("data:image/png") ? "PNG" : "JPEG";
+        try { const fmt = y.photo.startsWith("data:image/png") ? "PNG" : "JPEG";
           const imgW = 400, imgH = 260;
           doc.text("Bilde:", margin, yPos); yPos += 10;
           doc.addImage(y.photo, fmt, margin, yPos, imgW, imgH, undefined, "FAST");
@@ -508,3 +508,9 @@
 
   ReactDOM.createRoot(document.getElementById("root")).render(e(App));
 })();
+} catch (err) {
+  console.error('FATAL JS-FEIL:', err);
+  var el=document.getElementById('root');
+  if (el) el.innerHTML = '<pre style="white-space:pre-wrap;color:#b91c1c">JS-feil: '
+    + (err && (err.stack||err.message) || err) + '</pre>';
+}
