@@ -97,7 +97,13 @@ try {
       "Kontrolldato oppdatert"
     ]
   };
+
+  console.log('CHECKLISTS keys:', Object.keys(CHECKLISTS).length);
   const PRODUCT_TYPES = Object.keys(CHECKLISTS);
+  if (!PRODUCT_TYPES.length) {
+    console.warn('Ingen produkttyper funnet – bruker fallback');
+    PRODUCT_TYPES.push('EN361 / EN358 / EN813 – Sele','EN355 – Fangline / Falldemper','EN360 – Fallblokk');
+  }
 
   // ---------- Små UI-komponenter ----------
   const Button = (props) => e("button", { className: "btn", ...props }, props.children);
@@ -341,18 +347,18 @@ try {
       ),
       e(Card, { title: "Ny kunde" },
         e("div", { className: "row three" },
-          e("div", null, L("Kundenavn"), Input({ value: cust.name, onInput: ev => setCust({ ...cust, name: ev.target.value }) })),
-          e("div", null, L("Kontaktperson"), Input({ value: cust.contact, onInput: ev => setCust({ ...cust, contact: ev.target.value }) })),
-          e("div", null, L("Telefon"), Input({ value: cust.phone, onInput: ev => setCust({ ...cust, phone: ev.target.value }) }))
+          e("div", null, L("Kundenavn"), Input({ value: cust.name, onChange: ev => setCust({ ...cust, name: ev.target.value }) })),
+          e("div", null, L("Kontaktperson"), Input({ value: cust.contact, onChange: ev => setCust({ ...cust, contact: ev.target.value }) })),
+          e("div", null, L("Telefon"), Input({ value: cust.phone, onChange: ev => setCust({ ...cust, phone: ev.target.value }) }))
         ),
         e("div", { className: "row three" },
-          e("div", null, L("E-post"), Input({ value: cust.email, onInput: ev => setCust({ ...cust, email: ev.target.value }) })),
-          e("div", null, L("Org.nr"), Input({ value: cust.orgnr, onInput: ev => setCust({ ...cust, orgnr: ev.target.value }) }))
+          e("div", null, L("E-post"), Input({ value: cust.email, onChange: ev => setCust({ ...cust, email: ev.target.value }) })),
+          e("div", null, L("Org.nr"), Input({ value: cust.orgnr, onChange: ev => setCust({ ...cust, orgnr: ev.target.value }) }))
         ),
         e("div", { className: "row three" },
-          e("div", null, L("Gateadresse"), Input({ value: cust.street, onInput: ev => setCust({ ...cust, street: ev.target.value }) })),
-          e("div", null, L("Postnr"), Input({ value: cust.zip, onInput: ev => setCust({ ...cust, zip: ev.target.value }) })),
-          e("div", null, L("Poststed"), Input({ value: cust.city, onInput: ev => setCust({ ...cust, city: ev.target.value }) }))
+          e("div", null, L("Gateadresse"), Input({ value: cust.street, onChange: ev => setCust({ ...cust, street: ev.target.value }) })),
+          e("div", null, L("Postnr"), Input({ value: cust.zip, onChange: ev => setCust({ ...cust, zip: ev.target.value }) })),
+          e("div", null, L("Poststed"), Input({ value: cust.city, onChange: ev => setCust({ ...cust, city: ev.target.value }) }))
         ),
         e("div", { style: { marginTop: 10 } }, e(Button, { onClick: addCustomer }, "Lagre kunde"))
       )
@@ -372,20 +378,20 @@ try {
         ),
         e(Card, { title: "Legg til individ" },
           e("div", { className: "row two" },
-            e("div", null, L("Navn / betegnelse"), Input({ value: ind.name, onInput: ev => setInd({ ...ind, name: ev.target.value }) })),
-            e("div", null, L("Serienummer"), Input({ value: ind.serial, onInput: ev => setInd({ ...ind, serial: ev.target.value }) }))
+            e("div", null, L("Navn / betegnelse"), Input({ value: ind.name, onChange: ev => setInd({ ...ind, name: ev.target.value }) })),
+            e("div", null, L("Serienummer"), Input({ value: ind.serial, onChange: ev => setInd({ ...ind, serial: ev.target.value }) }))
           ),
           e("div", { className: "row two" },
             e("div", null, L("Type produkt"),
               Select({
                 value: ind.type,
-                onInput: ev => setInd({ ...ind, type: ev.target.value })
+                onChange: ev => setInd({ ...ind, type: ev.target.value })
               },
                 e("option", { value: "" }, "Velg …"),
                 ...PRODUCT_TYPES.map(t => e("option", { key: t, value: t }, t))
               )
             ),
-            e("div", null, L("Notater"), TextArea({ rows: 3, value: ind.notes, onInput: ev => setInd({ ...ind, notes: ev.target.value }) }))
+            e("div", null, L("Notater"), TextArea({ rows: 3, value: ind.notes, onChange: ev => setInd({ ...ind, notes: ev.target.value }) }))
           ),
           e("div", { style: { marginTop: 10 } }, e(Button, { onClick: addIndividual }, "Lagre individ"))
         ),
@@ -463,17 +469,17 @@ try {
 
     const NewCheck = () => e(Card, { title: `Ny årskontroll – ${currentIndividual ? currentIndividual.name : ""}` },
       e("div", { className: "row two" },
-        e("div", null, L("Dato"), Input({ type: "date", value: check.date, onInput: ev => setCheck({ ...check, date: ev.target.value }) })),
-        e("div", null, L("Kontrollør"), Input({ value: check.inspector, onInput: ev => setCheck({ ...check, inspector: ev.target.value }) }))
+        e("div", null, L("Dato"), Input({ type: "date", value: check.date, onChange: ev => setCheck({ ...check, date: ev.target.value }) })),
+        e("div", null, L("Kontrollør"), Input({ value: check.inspector, onChange: ev => setCheck({ ...check, inspector: ev.target.value }) }))
       ),
       e("div", { className: "row two" },
         e("div", null, L("Resultat"),
-          Select({ value: check.result, onInput: ev => setCheck({ ...check, result: ev.target.value }) },
+          Select({ value: check.result, onChange: ev => setCheck({ ...check, result: ev.target.value }) },
             e("option", null, "OK"),
             e("option", null, "Avvik")
           )
         ),
-        e("div", null, L("Notater"), TextArea({ rows: 3, value: check.notes, onInput: ev => setCheck({ ...check, notes: ev.target.value }) }))
+        e("div", null, L("Notater"), TextArea({ rows: 3, value: check.notes, onChange: ev => setCheck({ ...check, notes: ev.target.value }) }))
       ),
       e("div", { className: "divider" }),
       e("div", { style: { fontWeight: 700, marginBottom: 6 } }, "Vedlegg (valgfritt)"),
@@ -486,9 +492,9 @@ try {
       ...items.map((it, idx) => e("div", { key: it.key, className: "kundeitem", style: { alignItems: "flex-start" } },
         e("div", { style: { flex: 1 } },
           e("div", { className: "small", style: { fontWeight: 700 } }, it.label),
-          Input({ style: { marginTop: 8 }, placeholder: "Notat (valgfritt)", value: it.notes, onInput: ev => setItems(prev => prev.map((p, i) => i === idx ? { ...p, notes: ev.target.value } : p)) })
+          Input({ style: { marginTop: 8 }, placeholder: "Notat (valgfritt)", value: it.notes, onChange: ev => setItems(prev => prev.map((p, i) => i === idx ? { ...p, notes: ev.target.value } : p)) })
         ),
-        Select({ style: { width: 120 }, value: it.status, onInput: ev => setItems(prev => prev.map((p, i) => i === idx ? { ...p, status: ev.target.value } : p)) },
+        Select({ style: { width: 120 }, value: it.status, onChange: ev => setItems(prev => prev.map((p, i) => i === idx ? { ...p, status: ev.target.value } : p)) },
           e("option", null, "OK"), e("option", null, "Avvik"), e("option", null, "NA")
         )
       )),
@@ -514,3 +520,4 @@ try {
   if (el) el.innerHTML = '<pre style="white-space:pre-wrap;color:#b91c1c">JS-feil: '
     + (err && (err.stack||err.message) || err) + '</pre>';
 }
+```0
