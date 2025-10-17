@@ -3,57 +3,22 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>JS røyk-test</title>
-  <style>
-    body{margin:0;font:16px system-ui;background:#f6f9ff;color:#0f172a}
-    .wrap{max-width:720px;margin:0 auto;padding:20px}
-    .card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px;
-          box-shadow:0 4px 16px rgba(16,24,40,.06)}
-    .row{display:grid;gap:10px;grid-template-columns:1fr 1fr}
-    input,select{width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:10px}
-    .ok{color:#16a34a}.err{color:#b91c1c}
-  </style>
+  <title>Årskontroll – Web</title>
+  <link rel="stylesheet" href="styles.css"/>
 </head>
 <body>
-  <div class="wrap">
-    <h1>JS røyk-test</h1>
-    <div id="root" class="card">Laster…</div>
+  <div class="container">
+    <div class="appbar headerbar">
+      <h1>Årskontroll – Web</h1>
+      <div style="flex:1"></div>
+    </div>
+    <div id="root"></div>
   </div>
 
-  <script>
-    // Viser at JS kjører og bygger litt DOM
-    const root = document.getElementById('root');
-
-    // 1) Bekreft kjøring
-    const p = document.createElement('p');
-    p.innerHTML = "JavaScript status: <b class='ok'>KJØRER</b>";
-    root.innerHTML = ""; root.appendChild(p);
-
-    // 2) Lag et felt og en nedtrekksmeny (som i appen)
-    const form = document.createElement('div');
-    form.className = 'row';
-    const input = document.createElement('input');
-    input.placeholder = 'Skriv noe – skal ikke miste fokus';
-    input.addEventListener('input', () => console.log('Typing:', input.value));
-    const sel = document.createElement('select');
-    ['', 'EN361 / EN358 / EN813 – Sele', 'EN355 – Fangline / Falldemper', 'EN360 – Fallblokk']
-      .forEach(v => { const o=document.createElement('option'); o.value=v; o.textContent = v || 'Velg …'; sel.appendChild(o); });
-    form.appendChild(input); form.appendChild(sel);
-    root.appendChild(form);
-
-    // 3) Bekreft side-url (Pages vs. filvisning)
-    const urlp = document.createElement('p');
-    urlp.style.marginTop = '10px';
-    urlp.innerHTML = "URL: <code>"+location.href+"</code>";
-    root.appendChild(urlp);
-
-    // 4) Hint hvis du er på GitHub filvisning (JS kjøres ikke der)
-    if (location.hostname === 'github.com') {
-      const warn = document.createElement('p');
-      warn.className = 'err';
-      warn.textContent = 'Du åpner GitHub sin filvisning – her kjøres ikke JS. Bruk GitHub Pages-URL.';
-      root.appendChild(warn);
-    }
-  </script>
+  <!-- Riktig rekkefølge (enkelt og stabilt) -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="./app.js"></script>
 </body>
 </html>
