@@ -15,36 +15,12 @@
     <div id="root"></div>
   </div>
 
-  <!-- Robust skriptlasting: React -> ReactDOM -> jsPDF -> app.js -->
-  <script>
-    function addScript(src, onload, onerror){
-      var s=document.createElement('script'); s.src=src; s.defer=true; s.onload=onload;
-      s.onerror=function(){ console.error('Feil ved lasting:', src); if(onerror) onerror(); };
-      document.head.appendChild(s);
-    }
-    addScript("https://unpkg.com/react@18/umd/react.production.min.js", function(){
-      addScript("https://unpkg.com/react-dom@18/umd/react-dom.production.min.js", function(){
-        addScript("https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js", function(){
-          addScript("./app.js");
-        });
-      }, function(){
-        // fallback til jsDelivr for ReactDOM
-        addScript("https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js", function(){
-          addScript("https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js", function(){
-            addScript("./app.js");
-          });
-        });
-      });
-    }, function(){
-      // fallback til jsDelivr for React
-      addScript("https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js", function(){
-        addScript("https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js", function(){
-          addScript("https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js", function(){
-            addScript("./app.js");
-          });
-        });
-      });
-    });
-  </script>
+  <!-- Last UMD-bibliotekene i riktig rekkefølge -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin defer></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin defer></script>
+  <script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js" defer></script>
+
+  <!-- Din app -->
+  <script src="./app.js" defer></script>
 </body>
 </html>
