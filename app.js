@@ -442,16 +442,13 @@
       )
     );
 
-    // router (enkel state-basert)
+    // enkel router via state
     function Root(){
       const [v,setV]=React.useState("customers");
       const [custSel,setCustSel]=React.useState(null);
       const [indSel,setIndSel]=React.useState(null);
 
-      // Sync med ytre state (for enkelhet binder vi direkte)
-      React.useEffect(()=>{
-        setV(view); setCustSel(currentCustomer); setIndSel(currentIndividual);
-      },[view,currentCustomer,currentIndividual]);
+      React.useEffect(()=>{ setV(view); setCustSel(currentCustomer); setIndSel(currentIndividual); },[view,currentCustomer,currentIndividual]);
 
       return e(React.Fragment,null,
         v==="customers" && e(Customers),
@@ -464,6 +461,7 @@
     ReactDOM.createRoot(document.getElementById("root")).render(e(Root));
   }
 
-  // start
+  // start app
   App();
 })();
+```0
