@@ -1,9 +1,9 @@
 (function () {
   const React = window.React, ReactDOM = window.ReactDOM;
-  const { jsPDF } = window.jspdf || {};
+  const { jsPDF } = (window.jspdf || {});
   const e = React.createElement;
 
-  // ---------- helpers ----------
+  // --- helpers ---
   const LS = "aarskontroll_store_v20";
   const load = () => { try { return JSON.parse(localStorage.getItem(LS) || "{}"); } catch { return {}; } };
   const debouncedSave = (() => { let t=null; return (s)=>{ clearTimeout(t); t=setTimeout(()=>localStorage.setItem(LS, JSON.stringify(s)), 300); };})();
@@ -12,7 +12,7 @@
   const cleanType = (t="") => String(t).replace(/EN\s*\d+(\s*\/\s*EN\d+)*/gi,"").replace(/[–-]\s*/g,"").trim();
   const readFileAsDataURL = (file)=>new Promise((res,rej)=>{const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(file);});
 
-  // ---------- forhåndsdefinerte sjekklister ----------
+  // --- forhåndsdefinerte sjekklister ---
   const CHECKLISTS = {
     "EN361 / EN358 / EN813 – Sele": [
       "Merkelapp/ID lesbar og samsvarer med standard",
@@ -95,7 +95,7 @@
   };
   const PRODUCT_TYPES = Object.keys(CHECKLISTS);
 
-  // ---------- små UI-komponenter ----------
+  // --- små UI-komponenter ---
   const Button = (props)=>e("button",{className:"btn",...props},props.children);
   const BtnSec = (props)=>e("button",{className:"btn secondary",...props},props.children);
   const BtnDanger = (props)=>e("button",{className:"btn danger",...props},props.children);
@@ -105,15 +105,17 @@
   const TextArea=(props)=>e("textarea",{className:"input",...props});
   const Select=(props)=>e("select",{className:"input",...props});
 
-  // ---------- App ----------
+  // --- Hovedapp (ingen eksterne referanser) ---
   function App(){
+    // tilstand
     const [db,setDb]=React.useState(()=>({customers:[],individuals:[],checks:[],items:[],...load()}));
     React.useEffect(()=>debouncedSave(db),[db]);
 
-    const [view,setView]=React.useState("customers");
-    const [currentCustomer,setCurrentCustomer]=React.useState(null);
-    const [currentIndividual,setCurrentIndividual]=React.useState(null);
+    const [view,setView]=React.useState("customers");                 // "customers" | "customerDetail" | "reports" | "newCheck"
+    const [currentCustomer,setCurrentCustomer]=React.useState(null);  // valgt kunde
+    const [currentIndividual,setCurrentIndividual]=React.useState(null); // valgt individ
 
+    // skjema-state
     const [cust,setCust]=React.useState({name:"",contact:"",phone:"",email:"",orgnr:"",street:"",zip:"",city:""});
     const [ind,setInd]=React.useState({name:"",type:"",serial:"",notes:""});
     const [check,setCheck]=React.useState({date:today(),inspector:"",result:"OK",notes:""});
@@ -264,8 +266,8 @@
       doc.save(filename);
     };
 
-    // views
-    const Customers = ()=>e("div",{className:"grid two"},
+    // --- del-views (definert INNI App, så de ser state/funksjoner) ---
+    const CustomersView = ()=>e("div",{className:"grid two"},
       e(Card,{title:"Kunder"},
         e("div",{style:{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}},
           e(BtnSec,{onClick:exportBackup},"Eksporter backup (JSON)"),
@@ -317,7 +319,7 @@
       )
     );
 
-    const CustomerDetail = ()=>{
+    const CustomerDetailView = ()=>{
       const inds=db.individuals.filter(i=>i.customerId===currentCustomer.id);
       const checks=db.checks.filter(y=>inds.some(i=>i.id===y.individualId)).sort((a,b)=>b.date.localeCompare(a.date));
       return e("div",{className:"grid two"},
@@ -387,7 +389,7 @@
       );
     };
 
-    const Reports = ()=>{
+    const ReportsView = ()=>{
       const list=db.checks.filter(c=>c.individualId===currentIndividual.id).sort((a,b)=>b.date.localeCompare(a.date));
       return e(Card,{title:`Rapporter – ${currentIndividual.name}`},
         list.length===0?e("div",{className:"small"},"Ingen rapporter."):null,
@@ -406,7 +408,7 @@
       );
     };
 
-    const NewCheck = ()=>e(Card,{title:`Ny årskontroll – ${currentIndividual?currentIndividual.name:""}`},
+    const NewCheckView = ()=>e(Card,{title:`Ny årskontroll – ${currentIndividual?currentIndividual.name:""}`},
       e("div",{className:"row two"},
         e("div",null,L("Dato"),Input({type:"date",value:check.date,onChange:ev=>setCheck({...check,date:ev.target.value})})),
         e("div",null,L("Kontrollør"),Input({value:check.inspector,onChange:ev=>setCheck({...check,inspector:ev.target.value})}))
@@ -442,26 +444,15 @@
       )
     );
 
-    // enkel router via state
-    function Root(){
-      const [v,setV]=React.useState("customers");
-      const [custSel,setCustSel]=React.useState(null);
-      const [indSel,setIndSel]=React.useState(null);
-
-      React.useEffect(()=>{ setV(view); setCustSel(currentCustomer); setIndSel(currentIndividual); },[view,currentCustomer,currentIndividual]);
-
-      return e(React.Fragment,null,
-        v==="customers" && e(Customers),
-        v==="customerDetail" && custSel && e(CustomerDetail),
-        v==="reports" && indSel && e(Reports),
-        v==="newCheck" && indSel && e(NewCheck)
-      );
-    }
-
-    ReactDOM.createRoot(document.getElementById("root")).render(e(Root));
+    // --- render (kun App) ---
+    return e(React.Fragment,null,
+      view==="customers"      && e(CustomersView),
+      view==="customerDetail" && currentCustomer && e(CustomerDetailView),
+      view==="reports"        && currentIndividual && e(ReportsView),
+      view==="newCheck"       && currentIndividual && e(NewCheckView)
+    );
   }
 
-  // start app
-  App();
+  // start
+  ReactDOM.createRoot(document.getElementById("root")).render(e(App));
 })();
-```0
