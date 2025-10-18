@@ -26,7 +26,6 @@ h1{font-size:22px;margin:0;font-weight:800}
 .small{color:var(--muted);font-size:12px}
 .divider{height:1px;background:var(--stroke);margin:10px 0}
 .thumb{width:140px;height:100px;object-fit:cover;border:1px solid var(--stroke);border-radius:8px}
-/* avhukingsbokser */
 .choices{display:flex;gap:8px;flex-wrap:wrap}
 .choice{position:relative}
 .choice input{position:absolute;opacity:0;pointer-events:none}
@@ -34,6 +33,12 @@ h1{font-size:22px;margin:0;font-weight:800}
 .choice input:checked+label{border-color:#5aa8ff;box-shadow:0 0 0 3px rgba(90,168,255,.2)}
 .choice.ok input:checked+label{background:#eaf6ff}
 .choice.warn input:checked+label{background:#ffecec;border-color:#ef4444;color:#b91c1c}
+.settings{padding:10px;border:1px dashed var(--stroke);border-radius:12px;background:#fff}
+.toggle{display:flex;align-items:center;gap:10px;margin-top:8px}
+.toggle input{transform:scale(1.2)}
+.badge{display:inline-flex;align-items:center;gap:6px;background:#eef6ff;border:1px solid #cfe6ff;border-radius:999px;padding:6px 10px;font-size:12px;color:#0f172a}
+.badge.on{background:#e9fbe7;border-color:#b9f0af}
+.badge.off{background:#fff4f4;border-color:#ffd5d5}
 </style>
 </head>
 <body>
@@ -42,6 +47,7 @@ h1{font-size:22px;margin:0;font-weight:800}
   <div id="root">Laster…</div>
 </div>
 
+<!-- CDN-er -->
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
@@ -52,21 +58,23 @@ h1{font-size:22px;margin:0;font-weight:800}
   const { jsPDF }=(window.jspdf||{});
   const e=React.createElement, F=React.Fragment;
 
-  /* ---------- Helpers & data ---------- */
-  const LS="aarskontroll_store_v31";
+  /* ---------- Utils & LocalStore ---------- */
+  const LS="aarskontroll_store_v43";
   const load=()=>{try{return JSON.parse(localStorage.getItem(LS)||"{}")}catch{return{}}};
-  const saveDebounced=(()=>{let t=null;return s=>{clearTimeout(t);t=setTimeout(()=>localStorage.setItem(LS,JSON.stringify(s)),300)}})();
+  const saveDebouncedLS=(()=>{let t=null;return s=>{clearTimeout(t);t=setTimeout(()=>localStorage.setItem(LS,JSON.stringify(s)),300)}})();
   const uid=()=>Math.random().toString(36).slice(2)+Date.now().toString(36);
   const today=()=>new Date().toISOString().slice(0,10);
   const cleanType=(t="")=>String(t).replace(/EN\s*\d+(\s*\/\s*EN\d+)*/gi,"").replace(/[–-]\s*/g,"").trim();
   const readFileAsDataURL=f=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)});
 
+  /* ---------- Forhåndsdefinerte sjekklister ---------- */
   const CHECKLISTS={
     "EN361 / EN358 / EN813 – Sele":[
       "Merkelapp/ID lesbar og samsvarer med standard","Bånd/stropper uten kutt, rifter, oppflising eller misfarging",
       "Sømmer intakte – ingen løse tråder","D-ringer/spenner uten rust/deformasjon/skarpe kanter",
       "Justeringspunkter fungerer og holder posisjon","Polstring/festepunkter i god stand",
-      "Produsentens etikett/sertifisering lesbar","Utstyr rent/tørt/korrekt lagret","Ingen tegn til overbelastning/fall/modifikasjon"
+      "Produsentens etikett/sertifisering lesbar","Utstyr rent/tørt/korrekt lagret",
+      "Ingen tegn til overbelastning/fall/modifikasjon"
     ],
     "EN355 – Fangline / Falldemper":[
       "Merkelapp/ID lesbar – EN355","Falldemper ikke utløst/forlenget","Line uten kutt/slitasje/UV/kjemisk skade",
@@ -87,8 +95,8 @@ h1{font-size:22px;margin:0;font-weight:800}
       "Sømmer/termineringer uten skade","Bruksområde/merking samsvarer med bruk"
     ],
     "EN354 – Forbindelsesline":[
-      "Merkelapp lesbar – EN354","Tau uten kutt/rifter/UV/kjemisk skade","Endefester/sømmer intakte",
-      "Kroker fungerer og lukker korrekt","Lengde/type samsvarer med bruk"
+      "Merkelapp lesbar – EN354","Tau uten kutt/rifter/UV/kjemisk skade",
+      "Endefester/sømmer intakte","Kroker fungerer og lukker korrekt","Lengde/type samsvarer med bruk"
     ],
     "EN795 – Forankringsanordning":[
       "Merkelapp og produsentinfo lesbar – EN795","Forankringspunkt fast – uten sprekker/rust/deformasjon",
@@ -106,268 +114,127 @@ h1{font-size:22px;margin:0;font-weight:800}
   };
   const PRODUCT_TYPES=Object.keys(CHECKLISTS);
 
-  /* ---------- UI atoms ---------- */
+  /* ---------- GitHub direkte (PAT i nettleser) + Autosynk ---------- */
+  const GH_PATHS = {
+    customers:   "data/customers.json",
+    individuals: "data/individuals.json",
+    checks:      "data/checks.json",
+    items:       "data/items.json",
+    meta:        "data/meta.json",
+  };
+  const ghCfgKey = "gh_cfg_v2";
+  function loadGhCfg(){try{return JSON.parse(localStorage.getItem(ghCfgKey)||"{}")}catch{return{}}}
+  function saveGhCfg(cfg){localStorage.setItem(ghCfgKey, JSON.stringify(cfg||{}))}
+  const validCfg = (cfg)=> !!(cfg?.owner && cfg?.repo && cfg?.branch && cfg?.token);
+
+  async function ghGet(cfg, path){
+    const url=`https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${path}?ref=${encodeURIComponent(cfg.branch)}`;
+    const r=await fetch(url,{headers:{"Accept":"application/vnd.github+json","Authorization":`Bearer ${cfg.token}`}});
+    if(r.status===404) return {exists:false, content:null, sha:null};
+    if(!r.ok) throw new Error(`GET ${path} ${r.status}: ${await r.text()}`);
+    const data=await r.json();
+    const raw=data.content?atob(data.content):"";
+    let parsed=null; try{parsed=JSON.parse(raw)}catch{parsed=raw}
+    return {exists:true, content:parsed, sha:data.sha};
+  }
+  async function ghPut(cfg, path, content, message){
+    let sha;
+    try{const head=await ghGet(cfg,path); if(head.exists) sha=head.sha;}catch{}
+    const body={
+      message: message || `Årskontroll: oppdaterer ${path}`,
+      content: btoa(typeof content==="string"?content:JSON.stringify(content,null,2)),
+      branch: cfg.branch,
+      ...(sha?{sha}:{})
+    };
+    const url=`https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${path}`;
+    const r=await fetch(url,{method:"PUT",headers:{"Accept":"application/vnd.github+json","Authorization":`Bearer ${cfg.token}`},body:JSON.stringify(body)});
+    if(!r.ok) throw new Error(`PUT ${path} ${r.status}: ${await r.text()}`);
+    return r.json();
+  }
+  async function ghBatch(cfg, files, message){ for(const f of files){ await ghPut(cfg,f.path,f.content,message);} }
+
+  async function loadFromGitHub(cfg,setDb,setSuppress){
+    if(!validCfg(cfg)){alert("Fyll ut GitHub-innstillinger (Owner/Repo/Branch/PAT) først.");return;}
+    const out={};
+    for(const [k,p] of Object.entries(GH_PATHS)){ const res=await ghGet(cfg,p); out[k]=res.exists?res.content:(k==="meta"?{}:[]); }
+    setDb({customers:out.customers,individuals:out.individuals,checks:out.checks,items:out.items});
+    // Etter lesing, undertrykk autosynk kort for å unngå at samme data pushes tilbake
+    if(setSuppress){ setSuppress(1500); } // ms
+    alert("Data hentet fra GitHub.");
+  }
+  async function saveToGitHub(cfg,db){
+    if(!validCfg(cfg)){alert("Fyll ut GitHub-innstillinger (Owner/Repo/Branch/PAT) først.");return;}
+    const files=[
+      {path:GH_PATHS.customers,content:db.customers},
+      {path:GH_PATHS.individuals,content:db.individuals},
+      {path:GH_PATHS.checks,content:db.checks},
+      {path:GH_PATHS.items,content:db.items},
+      {path:GH_PATHS.meta,content:{updatedAt:new Date().toISOString(),version:1}},
+    ];
+    await ghBatch(cfg,files,"Årskontroll: oppdatert datafiler");
+    // Ikke alert i autosynk – men manuell "Last opp nå" kan vise alert:
+  }
+
+  /* ---------- Små UI-komponenter ---------- */
   const Button=p=>e("button",{className:"btn",...p},p.children);
   const BtnSec=p=>e("button",{className:"btn secondary",...p},p.children);
   const BtnDanger=p=>e("button",{className:"btn danger",...p},p.children);
-  const Card=({title,children,actions,style})=>e("div",{className:"card",style},
-    title?e("h3",null,title):null,children,actions?e("div",{style:{marginTop:8,display:"flex",gap:8,flexWrap:"wrap"}},actions):null);
+  const Card=({title,children,actions,style})=>e("div",{className:"card",style},title?e("h3",null,title):null,children,actions?e("div",{style:{marginTop:8,display:"flex",gap:8,flexWrap:"wrap"}},actions):null);
   const L=t=>e("div",{className:"label"},t);
   const Input=p=>e("input",{className:"input",...p});
   const TextArea=p=>e("textarea",{className:"input",...p});
-  const ProductTypeSelect=({value,onChange})=>e("select",{className:"input",value,onChange},
-    e(F,null,e("option",{value:""},"Velg …"),...PRODUCT_TYPES.map(t=>e("option",{key:t,value:t},t))));
-  const StatusBoxes=({name,value,onChange})=>e("div",{className:"choices"},
-    e("div",{className:"choice ok"}, e("input",{id:`${name}-ok`,type:"radio",name,value:"OK",checked:value==="OK",onChange:()=>onChange("OK")}), e("label",{htmlFor:`${name}-ok`},"OK")),
-    e("div",{className:"choice warn"}, e("input",{id:`${name}-anm`,type:"radio",name,value:"Anmerking",checked:value==="Anmerking",onChange:()=>onChange("Anmerking")}), e("label",{htmlFor:`${name}-anm`},"Anmerking"))
+
+  const Choices=({name,value,onChange,labels})=>e("div",{className:"choices"},
+    ...labels.map(([val,txt,cls])=>
+      e("div",{className:`choice ${cls||""}`,key:val},
+        e("input",{id:`${name}-${val}`,type:"radio",name,value:val,checked:value===val,onChange:()=>onChange(val)}),
+        e("label",{htmlFor:`${name}-${val}`},txt)
+      )
+    )
   );
-  const ResultBoxes=({value,onChange})=>e("div",{className:"choices"},
-    e("div",{className:"choice ok"}, e("input",{id:"res-ok",type:"radio",name:"res",value:"OK",checked:value==="OK",onChange:()=>onChange("OK")}), e("label",{htmlFor:"res-ok"},"OK")),
-    e("div",{className:"choice warn"}, e("input",{id:"res-under",type:"radio",name:"res",value:"Underkjent",checked:value==="Underkjent",onChange:()=>onChange("Underkjent")}), e("label",{htmlFor:"res-under"},"Underkjent"))
-  );
 
-  /* ---------- Views ---------- */
-  function CustomersView({db,cust,setCust,setView,setCurrentCustomer,exportBackup,importBackup,addCustomer,address,updateCustomer,deleteCustomer}){
-    return e("div",{className:"grid two"},
-      e(Card,{title:"Kunder"},
-        e("div",{style:{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}},
-          e(BtnSec,{onClick:exportBackup},"Eksporter backup (JSON)"),
-          e("label",{className:"btn secondary",style:{display:"inline-flex",alignItems:"center",gap:8,cursor:"pointer"}},"Importer backup",
-            e("input",{type:"file",accept:"application/json",style:{display:"none"},onChange:ev=>{const f=ev.target.files&&ev.target.files[0]; if(f) importBackup(f);}}))),
-        db.customers.length===0?e("div",{className:"small"},"Ingen kunder enda."):null,
-        e("ul",{style:{listStyle:"none",padding:0,margin:0}},
-          db.customers.map(c=>e("li",{key:c.id,className:"kundeitem"},
-            e("div",{onClick:()=>{setCurrentCustomer(c);setView("customerDetail");},style:{cursor:"pointer"}},
-              e("div",{style:{fontWeight:800}},c.name),
-              e("div",{className:"small"},address(c)),
-              e("div",{className:"small"},`Kontakt: ${c.contact||"-"} · ${c.phone||"-"}`)),
-            e("div",{style:{display:"flex",gap:6}},
-              e(BtnSec,{onClick:()=>{const name=prompt("Kundenavn",c.name); if(name===null)return;
-                const contact=prompt("Kontaktperson",c.contact||""); if(contact===null)return;
-                const phone=prompt("Telefon",c.phone||""); if(phone===null)return;
-                const email=prompt("E-post",c.email||""); if(email===null)return;
-                const orgnr=prompt("Org.nr",c.orgnr||""); if(orgnr===null)return;
-                const street=prompt("Gateadresse",c.street||""); if(street===null)return;
-                const zip=prompt("Postnr",c.zip||""); if(zip===null)return;
-                const city=prompt("Poststed",c.city||""); if(city===null)return;
-                updateCustomer({...c,name,contact,phone,email,orgnr,street,zip,city});}},"Rediger"),
-              e(BtnDanger,{onClick:()=>deleteCustomer(c.id)},"Slett"))))))
-      ,
-      e(Card,{title:"Ny kunde"},
-        e("div",{className:"row three"},
-          e("div",null,L("Kundenavn"),Input({value:cust.name,onChange:ev=>setCust({...cust,name:ev.target.value})})),
-          e("div",null,L("Kontaktperson"),Input({value:cust.contact,onChange:ev=>setCust({...cust,contact:ev.target.value})})),
-          e("div",null,L("Telefon"),Input({value:cust.phone,onChange:ev=>setCust({...cust,phone:ev.target.value})}))),
-        e("div",{className:"row three"},
-          e("div",null,L("E-post"),Input({value:cust.email,onChange:ev=>setCust({...cust,email:ev.target.value})})),
-          e("div",null,L("Org.nr"),Input({value:cust.orgnr,onChange:ev=>setCust({...cust,orgnr:ev.target.value})}))),
-        e("div",{className:"row three"},
-          e("div",null,L("Gateadresse"),Input({value:cust.street,onChange:ev=>setCust({...cust,street:ev.target.value})})),
-          e("div",null,L("Postnr"),Input({value:cust.zip,onChange:ev=>setCust({...cust,zip:ev.target.value})})),
-          e("div",null,L("Poststed"),Input({value:cust.city,onChange:ev=>setCust({...cust,city:ev.target.value})}))),
-        e("div",{style:{marginTop:10}},e(Button,{onClick:addCustomer},"Lagre kunde"))));
-  }
-
-  function CustomerDetailView({
-    db,currentCustomer,setView,ind,setInd,addIndividual,cleanType,setCurrentIndividual,
-    updateIndividual,deleteIndividual,address,exportPdf,deleteCheck,startChecklist,
-    bundleFrom,bundleTo,setBundleFrom,setBundleTo,exportCustomerBundle,mailCustomerBundle
-  }){
-    const inds=db.individuals.filter(i=>i.customerId===currentCustomer.id);
-    const checks=db.checks.filter(y=>inds.some(i=>i.id===y.individualId)).sort((a,b)=>b.date.localeCompare(a.date));
-    return e("div",{className:"grid two"},
-      e(Card,{title:"Kunde"},
-        e("div",{style:{fontWeight:800,fontSize:18}},currentCustomer.name),
-        e("div",{className:"small"},address(currentCustomer)),
-        e("div",{className:"small"},`Kontakt: ${currentCustomer.contact||"-"} · ${currentCustomer.phone||"-"}`),
-        e("div",{className:"small"},`E-post: ${currentCustomer.email||"-"} · Org.nr: ${currentCustomer.orgnr||"-"}`),
-        e("div",{className:"divider"}),
-        e(BtnSec,{onClick:()=>setView("customers")},"Tilbake"),
-        e("div",{className:"divider"}),
-        e("div",null,e("strong",null,"Samlerapport (PDF) – landskap")),
-        e("div",{className:"row two",style:{marginTop:8}},
-          e("div",null,L("Fra dato"),Input({type:"date",value:bundleFrom,onChange:ev=>setBundleFrom(ev.target.value)})),
-          e("div",null,L("Til dato"),Input({type:"date",value:bundleTo,onChange:ev=>setBundleTo(ev.target.value)}))),
-        e("div",{style:{display:"flex",gap:8,marginTop:8}},
-          e(Button,{onClick:()=>exportCustomerBundle(currentCustomer,bundleFrom,bundleTo)},"Lag samlerapport"),
-          e(BtnSec,{onClick:()=>mailCustomerBundle(currentCustomer,bundleFrom,bundleTo)},"Lag og åpne e-post"))
-      ),
-      e(Card,{title:"Legg til individ"},
-        e("div",{className:"row two"},
-          e("div",null,L("Navn / betegnelse"),Input({value:ind.name,onChange:ev=>setInd({...ind,name:ev.target.value})})),
-          e("div",null,L("Serienummer"),Input({value:ind.serial,onChange:ev=>setInd({...ind,serial:ev.target.value})}))),
-        e("div",{className:"row two"},
-          e("div",null,L("Type produkt"),e(ProductTypeSelect,{value:ind.type,onChange:ev=>setInd({...ind,type:ev.target.value})})),
-          e("div",null,L("Notater"),TextArea({rows:3,value:ind.notes,onChange:ev=>setInd({...ind,notes:ev.target.value})}))),
-        e("div",{style:{marginTop:10}},e(Button,{onClick:addIndividual},"Lagre individ"))
-      ),
-      e(Card,{title:"Individer",style:{gridColumn:"1 / -1"}},
-        inds.length===0?e("div",{className:"small"},"Ingen individer registrert."):null,
-        e("ul",{style:{listStyle:"none",padding:0,margin:0}},
-          inds.map(i=>{
-            const last=db.checks.filter(y=>y.individualId===i.id).sort((a,b)=>b.date.localeCompare(a.date))[0];
-            return e("li",{key:i.id,className:"kundeitem"},
-              e("div",null,
-                e("div",{style:{fontWeight:800}},i.name),
-                e("div",{className:"small"},`${cleanType(i.type)} ${i.serial?`· SN: ${i.serial}`:""}`),
-                e("div",{className:"small"},`Sist kontroll: ${last?`${last.date} – ${last.result}`:"–"}`)),
-              e("div",{style:{display:"flex",gap:6}},
-                e(BtnSec,{onClick:()=>{setCurrentIndividual(i);setView("reports");}},"Se rapporter"),
-                e(Button,{onClick:()=>startChecklist(i)},"Ny årskontroll"),
-                e(BtnSec,{onClick:()=>{const name=prompt("Navn",i.name);if(name===null)return;
-                  const type=prompt("Type",i.type);if(type===null)return;
-                  const serial=prompt("Serienummer",i.serial||"");if(serial===null)return;
-                  const notes=prompt("Notater",i.notes||"");if(notes===null)return;
-                  updateIndividual({...i,name,type,serial,notes});}},"Rediger"),
-                e(BtnDanger,{onClick:()=>deleteIndividual(i.id)},"Slett")));
-          }))
-      ),
-      checks.length>0?e(Card,{title:"Siste rapporter",style:{gridColumn:"1 / -1"}},
-        ...checks.slice(0,5).map(y=>e("div",{key:y.id,className:"kundeitem"},
-          e("div",null,
-            e("div",{style:{fontWeight:700}},`${y.date} – ${y.result}`),
-            e("div",{className:"small"},db.individuals.find(i=>i.id===y.individualId)?.name||""),
-            y.photo?e("img",{src:y.photo,className:"thumb",alt:"Vedlagt bilde"}):null),
-          e("div",{style:{display:"flex",gap:6}},
-            e(BtnSec,{onClick:()=>exportPdf(y)},"PDF"),
-            e(BtnDanger,{onClick:()=>deleteCheck(y.id)},"Slett"))))):null
+  const ProductTypeSelect=({value,onChange})=>
+    e("select",{className:"input",value,onChange},
+      e("option",{value:""},"Velg …"),
+      ...PRODUCT_TYPES.map(t=>e("option",{key:t,value:t},t))
     );
-  }
 
-  function ReportsView({db,currentIndividual,setView,exportPdf,deleteCheck}){
-    const list=db.checks.filter(c=>c.individualId===currentIndividual.id).sort((a,b)=>b.date.localeCompare(a.date));
-    return e(Card,{title:`Rapporter – ${currentIndividual.name}`},
-      list.length===0?e("div",{className:"small"},"Ingen rapporter."):null,
-      ...list.map(y=>e("div",{key:y.id,className:"kundeitem"},
-        e("div",null,
-          e("div",{style:{fontWeight:700}},`${y.date} – ${y.result}`),
-          e("div",{className:"small"},y.inspector||""),
-          y.photo?e("img",{src:y.photo,className:"thumb",alt:"Vedlagt bilde"}):null),
-        e("div",{style:{display:"flex",gap:6}},
-          e(BtnSec,{onClick:()=>exportPdf(y)},"PDF"),
-          e(BtnDanger,{onClick:()=>deleteCheck(y.id)},"Slett")))),
-      e("div",{style:{marginTop:10}},e(BtnSec,{onClick:()=>setView("customerDetail")},"Tilbake"))
-    );
-  }
+  /* ---------- GitHub Settings UI (med autosynk) ---------- */
+  function GitHubSettings({ cfg, setCfg, onLoad, onSave }){
+    const setField = (k,v)=>{ const next={...cfg,[k]:v}; setCfg(next); saveGhCfg(next); };
 
-  function NewCheckView({db,currentIndividual,setView,check,setCheck,items,setItems,photo,setPhoto,readFileAsDataURL,saveCheck}){
-    const anm=items.reduce((a,b)=>a+(b.status==="Anmerking"?1:0),0);
-    return e(Card,{title:`Ny årskontroll – ${currentIndividual?currentIndividual.name:""}`},
+    return e("div",{className:"settings"},
+      e("div",null,L("Owner"),  Input({value:cfg.owner||"",  onChange:ev=>setField("owner",ev.target.value)})),
+      e("div",null,L("Repo"),   Input({value:cfg.repo||"",   onChange:ev=>setField("repo",ev.target.value)})),
       e("div",{className:"row two"},
-        e("div",null,L("Dato"),Input({type:"date",value:check.date,onChange:ev=>setCheck({...check,date:ev.target.value})})),
-        e("div",null,L("Kontrollør"),Input({value:check.inspector,onChange:ev=>setCheck({...check,inspector:ev.target.value})}))),
-      e("div",{className:"row two"},
-        e("div",null,L("Resultat"),e(ResultBoxes,{value:check.result,onChange:v=>setCheck({...check,result:v})})),
-        e("div",null,L("Notater"),TextArea({rows:3,value:check.notes,onChange:ev=>setCheck({...check,notes:ev.target.value})}))),
-      e("div",{className:"small",style:{marginTop:6}},`Anmerking: ${anm}`),
-      e("div",{className:"divider"}),
-      e("div",{style:{fontWeight:700,marginBottom:6}},"Vedlegg (valgfritt)"),
-      e("div",{style:{display:"flex",alignItems:"center",gap:10,marginBottom:10}},
-        e("input",{type:"file",accept:"image/*",onChange:async ev=>{const f=ev.target.files&&ev.target.files[0];if(!f)return;const data=await readFileAsDataURL(f);setPhoto(data);}}),
-        photo?e("img",{src:photo,className:"thumb",alt:"Vedlagt bilde"}):null),
-      e("div",{className:"divider"}),
-      e("div",{style:{fontWeight:700,marginBottom:6}},"Sjekkliste"),
-      ...items.map((it,idx)=>e("div",{key:it.key,className:"kundeitem",style:{alignItems:"flex-start",gap:12}},
-        e("div",{style:{flex:1}},
-          e("div",{className:"small",style:{fontWeight:700}},it.label),
-          Input({style:{marginTop:8},placeholder:"Notat (valgfritt)",value:it.notes,onChange:ev=>setItems(p=>p.map((q,i)=>i===idx?{...q,notes:ev.target.value}:q))})
-        ),
-        e(StatusBoxes,{name:`st-${idx}`,value:it.status,onChange:v=>setItems(p=>p.map((q,i)=>i===idx?{...q,status:v}:q))})
-      )),
-      e("div",{style:{display:"flex",gap:8,marginTop:10}},
-        e(BtnSec,{onClick:()=>setView("customerDetail")},"Avbryt"),
-        e(Button,{onClick:saveCheck},"Lagre kontroll"))
+        e("div",null,L("Branch"), Input({value:cfg.branch||"main", onChange:ev=>setField("branch",ev.target.value)})),
+        e("div",null,L("PAT (fine-grained)"), Input({type:"password",value:cfg.token||"",onChange:ev=>setField("token",ev.target.value)}))
+      ),
+      e("div",{className:"toggle"},
+        e("input",{id:"autosync",type:"checkbox",checked:!!cfg.autosync,onChange:ev=>setField("autosync",ev.target.checked)}),
+        e("label",{for:"autosync"},"Autosynk til GitHub"),
+        e("span",{className:`badge ${cfg.autosync?'on':'off'}`}, cfg.autosync?'På':'Av')
+      ),
+      e("div",{style:{display:"flex",gap:8,marginTop:8}},
+        e(BtnSec,{onClick:()=>{saveGhCfg(cfg); alert("Lagret innstillinger lokalt.");}},"Lagre innstillinger"),
+        e(BtnSec,{onClick:async()=>{saveGhCfg(cfg); await onLoad(cfg);}},"Hent fra GitHub"),
+        e(Button,{onClick:async()=>{saveGhCfg(cfg); await onSave(cfg,true); alert("Data lagret til GitHub.");}},"Last opp nå")
+      )
     );
   }
 
-  /* ---------- PDF helpers ---------- */
-  function renderSingleReport(doc,y,dbRef){ // portrait A4
-    const margin=40, pageW=doc.internal.pageSize.getWidth(), pageH=doc.internal.pageSize.getHeight();
-    let yPos=margin;
-
-    const indiv=dbRef.individuals.find(i=>i.id===y.individualId)||{};
-    const cust =dbRef.customers.find(c=>c.id===indiv.customerId)||{};
-
-    doc.setFontSize(16); doc.setTextColor(0,0,0);
-    doc.text(`${cleanType(indiv.type||"Produkt")} – årskontroll`,margin,yPos); yPos+=26;
-
-    doc.setFontSize(11);
-    const line=(k,v)=>{doc.text(`${k}: ${v||""}`,margin,yPos); yPos+=16;};
-    line("Kunde",cust.name||"");
-    line("Individ",`${indiv.name||""}${indiv.serial?" – "+indiv.serial:""}`);
-    line("Dato",y.date); line("Kontrollør",y.inspector); line("Resultat",y.result);
-    if(y.notes){doc.text("Notater:",margin,yPos); yPos+=16; doc.text(y.notes,margin,yPos); yPos+=18;}
-
-    if(y.photo){try{
-      const fmt=y.photo.startsWith("data:image/png")?"PNG":"JPEG";
-      const imgW=400,imgH=260;
-      doc.text("Bilde:",margin,yPos); yPos+=10;
-      doc.addImage(y.photo,fmt,margin,yPos,imgW,imgH,undefined,"FAST");
-      yPos+=imgH+10;
-    }catch{}}
-
-    yPos+=6; doc.setFontSize(12); doc.text("Sjekkliste",margin,yPos); yPos+=12;
-    const tableW=pageW-margin*2;
-    const colW=[tableW*0.58,tableW*0.12,tableW*0.30];
-    doc.setDrawColor(180); doc.setLineWidth(0.8);
-
-    // header
-    doc.setFillColor(90,168,255); doc.setTextColor(255);
-    doc.rect(margin,yPos,colW[0],24,"FD");
-    doc.rect(margin+colW[0],yPos,colW[1],24,"FD");
-    doc.rect(margin+colW[0]+colW[1],yPos,colW[2],24,"FD");
-    doc.text("Punkt",margin+6,yPos+16);
-    doc.text("Status",margin+colW[0]+6,yPos+16);
-    doc.text("Notat",margin+colW[0]+colW[1]+6,yPos+16);
-    doc.setTextColor(0,0,0); yPos+=24;
-
-    const rows=dbRef.items.filter(i=>i.yearcheckId===y.id).map(r=>({punkt:r.label,status:r.status,notat:r.notes||""}));
-    const rowH=28;
-    rows.forEach(r=>{
-      const isAnm=String(r.status).toLowerCase()==="anmerking";
-      if(isAnm) doc.setFillColor(255,235,238);
-      doc.rect(margin,yPos,colW[0],rowH,isAnm?"FD":"S");
-      doc.rect(margin+colW[0],yPos,colW[1],rowH,isAnm?"FD":"S");
-      doc.rect(margin+colW[0]+colW[1],yPos,colW[2],rowH,isAnm?"FD":"S");
-      if(isAnm) doc.setFillColor(255,255,255);
-      doc.text(r.punkt,margin+6,yPos+18);
-      doc.text(r.status||"",margin+colW[0]+6,yPos+18);
-      doc.text(r.notat||"",margin+colW[0]+colW[1]+6,yPos+18);
-      yPos+=rowH;
-    });
-
-// --- VANNMERKE: fast størrelse 40 px, horisontalt i gapet
-const footerTop  = pageH - 60;
-const gapTop     = yPos + 12;          // litt luft under tabellen
-const gapBottom  = footerTop - 12;     // litt luft over footer
-const gapHeight  = gapBottom - gapTop;
-
-if ((y.result || "").toLowerCase() === "underkjent" && gapHeight > 50) {
-  const text = "UNDERKJENT";
-  const fontSize = 40;                 // fast størrelse
-  doc.setFontSize(fontSize);
-
-  // Tegn vannmerket midt i gapet (ingen rotasjon), svak opacity
-  const centerY = gapTop + gapHeight / 2;
-  if (doc.GState && doc.setGState) doc.setGState(doc.GState({ opacity: 0.14 }));
-  doc.setTextColor(200, 0, 0);
-  doc.text(text, pageW / 2, centerY, { align: "center" });
-  if (doc.GState && doc.setGState) doc.setGState(doc.GState({ opacity: 1 }));
-  doc.setTextColor(0, 0, 0);
-}
-
-    // footer
-    doc.setFontSize(10);
-    const yFooter=pageH-60;
-    doc.setDrawColor(200); doc.line(margin,yFooter,pageW-margin,yFooter);
-    const foot=["Petersson Industri og Service","Smed Qvales vei 19b, 8012 Bodø","Tlf: +47 911 28 084 – E-post: bjorn.petersson@outlook.com","Org.nr: 933 939 871 MVA"];
-    let fy=yFooter+14; foot.forEach(t=>{doc.text(t,margin,fy); fy+=12;});
-  }
-
-  /* ---------- App + PDF ---------- */
+  /* ---------- App ---------- */
   function App(){
     const [db,setDb]=React.useState(()=>({customers:[],individuals:[],checks:[],items:[],...load()}));
-    React.useEffect(()=>saveDebounced(db),[db]);
+    React.useEffect(()=>saveDebouncedLS(db),[db]);
+
+    const [ghCfg,setGhCfg]=React.useState(()=>({
+      owner:  loadGhCfg().owner  || "biffrikk-ai",
+      repo:   loadGhCfg().repo   || "aarskontroll-data",
+      branch: loadGhCfg().branch || "main",
+      token:  loadGhCfg().token  || "",
+      autosync: !!loadGhCfg().autosync
+    }));
 
     const [view,setView]=React.useState("customers");
     const [currentCustomer,setCurrentCustomer]=React.useState(null);
@@ -379,61 +246,221 @@ if ((y.result || "").toLowerCase() === "underkjent" && gapHeight > 50) {
     const [items,setItems]=React.useState([]);
     const [photo,setPhoto]=React.useState(null);
 
-    const [bundleFrom,setBundleFrom]=React.useState(()=>today());
-    const [bundleTo,setBundleTo]=React.useState(()=>today());
+    const [bundleFrom,setBundleFrom]=React.useState(today());
+    const [bundleTo,setBundleTo]=React.useState(today());
 
     const address=c=>[c.street,[c.zip,c.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
 
+    // Fyll sjekkliste når ny kontroll starter
     React.useEffect(()=>{
-      if(view==="newCheck"&&currentIndividual&&(!items||items.length===0)){
-        const base=(CHECKLISTS[currentIndividual.type]||[]).map((label,i)=>({key:"k"+i,label,status:"OK",notes:""}));
-        setItems(base);
+      if(view==="newCheck" && currentIndividual && items.length===0){
+        setItems((CHECKLISTS[currentIndividual.type]||[]).map((label,i)=>({key:"k"+i,label,status:"OK",notes:""})));
       }
     },[view,currentIndividual]);
 
-    const exportBackup=()=>{const blob=new Blob([JSON.stringify(db,null,2)],{type:"application/json"});
-      const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`aarskontroll-backup_${today()}.json`;a.click();URL.revokeObjectURL(a.href);};
-    const importBackup=async(file)=>{try{const data=JSON.parse(await file.text());setDb({customers:[],individuals:[],checks:[],items:[],...data});alert("Backup importert!");}catch(e){alert("Kunne ikke importere: "+e.message);}};
+    /* ---- Autosynk: debounce + undertrykking etter fetch ---- */
+    const autosyncTimerRef = React.useRef(null);
+    const suppressUntilRef = React.useRef(0); // timestamp ms
 
-    const addCustomer=()=>{if(!cust.name.trim())return alert("Kundenavn må fylles ut");
-      const c={id:uid(),...cust};setDb(s=>({...s,customers:[...s.customers,c]}));
-      setCust({name:"",contact:"",phone:"",email:"",orgnr:"",street:"",zip:"",city:""});};
+    // Undertrykk autosynk i ms fra nå:
+    const setSuppress = (ms)=>{ suppressUntilRef.current = Date.now() + (ms||0); };
+
+    React.useEffect(()=>{
+      if(!ghCfg.autosync || !validCfg(ghCfg)) return;
+      // Ikke autosynk hvis nylig hentet fra GitHub
+      if(Date.now() < suppressUntilRef.current) return;
+      // Debounce 1500 ms
+      if(autosyncTimerRef.current) clearTimeout(autosyncTimerRef.current);
+      autosyncTimerRef.current = setTimeout(async ()=>{
+        try{
+          await saveToGitHub(ghCfg, db);
+          // (Bevisst ingen alert her)
+        }catch(err){
+          console.warn("Autosynk feilet:", err);
+        }
+      }, 1500);
+      return ()=>{ if(autosyncTimerRef.current) clearTimeout(autosyncTimerRef.current); };
+    }, [db, ghCfg.autosync, ghCfg.owner, ghCfg.repo, ghCfg.branch, ghCfg.token]);
+
+    /* ---- Backup ---- */
+    const exportBackup=()=>{
+      const blob=new Blob([JSON.stringify(db,null,2)],{type:"application/json"});
+      const a=document.createElement("a");
+      a.href=URL.createObjectURL(blob);
+      a.download=`aarskontroll-backup_${today()}.json`;
+      a.click(); URL.revokeObjectURL(a.href);
+    };
+    const importBackup=async(file)=>{
+      try{
+        const data=JSON.parse(await file.text());
+        setDb({customers:[],individuals:[],checks:[],items:[],...data});
+        setSuppress(1500);
+        alert("Backup importert!");
+      }catch(e){ alert("Kunne ikke importere: "+e.message); }
+    };
+
+    /* ---- CRUD Kundar/Individer ---- */
+    const addCustomer=()=>{
+      if(!cust.name.trim()) return alert("Kundenavn må fylles ut");
+      const c={id:uid(),...cust};
+      setDb(s=>({...s,customers:[...s.customers,c]}));
+      setCust({name:"",contact:"",phone:"",email:"",orgnr:"",street:"",zip:"",city:""});
+    };
     const updateCustomer=c=>setDb(s=>({...s,customers:s.customers.map(x=>x.id===c.id?c:x)}));
-    const deleteCustomer=id=>{if(!confirm("Slette kunde og alt knyttet?"))return;
-      setDb(s=>{const inds=s.individuals.filter(i=>i.customerId===id).map(i=>i.id);return{
-        customers:s.customers.filter(c=>c.id!==id),
-        individuals:s.individuals.filter(i=>i.customerId!==id),
-        checks:s.checks.filter(y=>!inds.includes(y.individualId)),
-        items:s.items.filter(it=>!s.checks.some(y=>inds.includes(y.individualId)&&it.yearcheckId===y.id))};});
-      setCurrentCustomer(null);setView("customers");};
+    const deleteCustomer=id=>{
+      if(!confirm("Slette kunde og alt knyttet?")) return;
+      setDb(s=>{
+        const inds=s.individuals.filter(i=>i.customerId===id).map(i=>i.id);
+        return {
+          customers:s.customers.filter(c=>c.id!==id),
+          individuals:s.individuals.filter(i=>i.customerId!==id),
+          checks:s.checks.filter(y=>!inds.includes(y.individualId)),
+          items:s.items.filter(it=>!s.checks.some(y=>inds.includes(y.individualId)&&it.yearcheckId===y.id))
+        };
+      });
+      setCurrentCustomer(null); setView("customers");
+    };
 
-    const addIndividual=()=>{if(!currentCustomer)return alert("Velg kunde");
-      if(!ind.name.trim())return alert("Navn må fylles ut");
-      if(!ind.type)return alert("Velg type");
+    const addIndividual=()=>{
+      if(!currentCustomer) return alert("Velg kunde");
+      if(!ind.name.trim()) return alert("Navn må fylles ut");
+      if(!ind.type) return alert("Velg type");
       const d={id:uid(),customerId:currentCustomer.id,...ind};
       setDb(s=>({...s,individuals:[...s.individuals,d]}));
-      setInd({name:"",type:"",serial:"",notes:""});};
+      setInd({name:"",type:"",serial:"",notes:""});
+    };
     const updateIndividual=d=>setDb(s=>({...s,individuals:s.individuals.map(x=>x.id===d.id?d:x)}));
-    const deleteIndividual=id=>{if(!confirm("Slette individ og tilhørende rapporter?"))return;
-      setDb(s=>{const checks=s.checks.filter(y=>y.individualId===id).map(y=>y.id);return {...s,
-        individuals:s.individuals.filter(i=>i.id!==id),
-        checks:s.checks.filter(y=>y.individualId!==id),
-        items:s.items.filter(it=>!checks.includes(it.yearcheckId))};});
-      if(currentIndividual&&currentIndividual.id===id){setCurrentIndividual(null);setView("customerDetail");}};
+    const deleteIndividual=id=>{
+      if(!confirm("Slette individ og tilhørende rapporter?")) return;
+      setDb(s=>{
+        const checks=s.checks.filter(y=>y.individualId===id).map(y=>y.id);
+        return {
+          ...s,
+          individuals:s.individuals.filter(i=>i.id!==id),
+          checks:s.checks.filter(y=>y.individualId!==id),
+          items:s.items.filter(it=>!checks.includes(it.yearcheckId))
+        };
+      });
+      if(currentIndividual&&currentIndividual.id===id){ setCurrentIndividual(null); setView("customerDetail"); }
+    };
 
-    const startChecklist=(individual)=>{setCurrentIndividual(individual);
-      const base=(CHECKLISTS[individual.type]||[]).map((label,i)=>({key:"k"+i,label,status:"OK",notes:""}));
-      setItems(base);setPhoto(null);setCheck({date:today(),inspector:"Bjørn Petersson",result:"OK",notes:""});setView("newCheck");};
+    const startChecklist=(individual)=>{
+      setCurrentIndividual(individual);
+      setItems((CHECKLISTS[individual.type]||[]).map((label,i)=>({key:"k"+i,label,status:"OK",notes:""})));
+      setPhoto(null);
+      setCheck({date:today(),inspector:"Bjørn Petersson",result:"OK",notes:""});
+      setView("newCheck");
+    };
 
-    const saveCheck=()=>{const y={id:uid(),individualId:currentIndividual.id,photo:photo||null,...check,
-        nextDate:new Date(new Date(check.date).setFullYear(new Date(check.date).getFullYear()+1)).toISOString().slice(0,10)};
+    const saveCheck=()=>{
+      const y={
+        id:uid(), individualId:currentIndividual.id, photo:photo||null,
+        ...check,
+        nextDate:new Date(new Date(check.date).setFullYear(new Date(check.date).getFullYear()+1)).toISOString().slice(0,10)
+      };
       const its=items.map(i=>({id:uid(),yearcheckId:y.id,...i}));
       setDb(s=>({...s,checks:[y,...s.checks],items:[...s.items,...its]}));
-      setView("customerDetail");};
-    const deleteCheck=id=>{if(!confirm("Slette denne rapporten?"))return;
-      setDb(s=>({...s,checks:s.checks.filter(y=>y.id!==id),items:s.items.filter(i=>i.yearcheckId!==id)}));};
+      setView("customerDetail");
+    };
 
-    // ------- PDF: enkeltrapport (portrait) eksport ------
+    const deleteCheck=id=>{
+      if(!confirm("Slette denne rapporten?")) return;
+      setDb(s=>({...s,checks:s.checks.filter(y=>y.id!==id),items:s.items.filter(i=>i.yearcheckId!==id)}));
+    };
+
+    /* ---- PDF-rendering ---- */
+    function renderSingleReport(doc,y,dbRef){
+      const margin=40, pageW=doc.internal.pageSize.getWidth(), pageH=doc.internal.pageSize.getHeight();
+      let yPos=margin;
+      const indiv=dbRef.individuals.find(i=>i.id===y.individualId)||{};
+      const cust=dbRef.customers.find(c=>c.id===indiv.customerId)||{};
+
+      doc.setFontSize(16);
+      doc.text(`${cleanType(indiv.type||"Produkt")} – årskontroll`, margin, yPos); yPos+=26;
+
+      doc.setFontSize(11);
+      const line=(k,v)=>{ doc.text(`${k}: ${v||""}`, margin, yPos); yPos+=16; };
+      const indivLine=`${indiv.name||""}${indiv.serial?" – "+indiv.serial:""}`;
+      line("Kunde", cust.name||"");
+      line("Individ", indivLine);
+      line("Dato", y.date);
+      line("Kontrollør", y.inspector);
+      line("Resultat", y.result);
+
+      if(y.notes){
+        doc.text("Notater:", margin, yPos); yPos+=16;
+        doc.text(y.notes, margin, yPos); yPos+=18;
+      }
+
+      if(y.photo){
+        try{
+          const fmt = y.photo.startsWith("data:image/png") ? "PNG" : "JPEG";
+          const imgW=400, imgH=260;
+          doc.text("Bilde:", margin, yPos); yPos+=10;
+          doc.addImage(y.photo, fmt, margin, yPos, imgW, imgH, undefined, "FAST");
+          yPos += imgH + 10;
+        }catch{}
+      }
+
+      yPos+=6; doc.setFontSize(12); doc.text("Sjekkliste", margin, yPos); yPos+=12;
+
+      const tableW=pageW-margin*2, colW=[tableW*0.58, tableW*0.12, tableW*0.30];
+      doc.setDrawColor(180); doc.setLineWidth(0.8);
+      doc.setFillColor(90,168,255); doc.setTextColor(255);
+      doc.rect(margin,yPos,colW[0],24,"FD");
+      doc.rect(margin+colW[0],yPos,colW[1],24,"FD");
+      doc.rect(margin+colW[0]+colW[1],yPos,tableW-(colW[0]+colW[1]),24,"FD");
+      doc.text("Punkt", margin+6, yPos+16);
+      doc.text("Status", margin+colW[0]+6, yPos+16);
+      doc.text("Notat",  margin+colW[0]+colW[1]+6, yPos+16);
+      doc.setTextColor(0,0,0); yPos+=24;
+
+      const rows=dbRef.items.filter(i=>i.yearcheckId===y.id).map(r=>({punkt:r.label,status:r.status,notat:r.notes||""}));
+      const rowH=28;
+      rows.forEach(r=>{
+        const isAnm=String(r.status).toLowerCase()==="anmerking";
+        if(isAnm) doc.setFillColor(255,235,238);
+        doc.rect(margin, yPos, colW[0], rowH, isAnm?"FD":"S");
+        doc.rect(margin+colW[0], yPos, colW[1], rowH, isAnm?"FD":"S");
+        doc.rect(margin+colW[0]+colW[1], yPos, tableW-(colW[0]+colW[1]), rowH, isAnm?"FD":"S");
+        if(isAnm) doc.setFillColor(255,255,255);
+        doc.text(r.punkt, margin+6, yPos+18);
+        doc.text(r.status||"", margin+colW[0]+6, yPos+18);
+        doc.text(r.notat||"",  margin+colW[0]+colW[1]+6, yPos+18);
+        yPos+=rowH;
+      });
+
+      // Vannmerke: fast 40px, midt i gapet mellom tabell og footer
+      const footerTop  = pageH - 60;
+      const gapTop     = yPos + 12;
+      const gapBottom  = footerTop - 12;
+      const gapHeight  = gapBottom - gapTop;
+      if((y.result||"").toLowerCase()==="underkjent" && gapHeight>50){
+        const text="UNDERKJENT";
+        const fontSize=40;
+        doc.setFontSize(fontSize);
+        const centerY=gapTop + gapHeight/2;
+        if(doc.GState&&doc.setGState) doc.setGState(doc.GState({opacity:0.14}));
+        doc.setTextColor(200,0,0);
+        doc.text(text, pageW/2, centerY, {align:"center"});
+        if(doc.GState&&doc.setGState) doc.setGState(doc.GState({opacity:1}));
+        doc.setTextColor(0,0,0);
+      }
+
+      // Footer
+      doc.setFontSize(10);
+      const yFooter=pageH-60;
+      doc.setDrawColor(200);
+      doc.line(margin, yFooter, pageW-margin, yFooter);
+      const foot=[
+        "Petersson Industri og Service",
+        "Smed Qvales vei 19b, 8012 Bodø",
+        "Tlf: +47 911 28 084 – E-post: bjorn.petersson@outlook.com",
+        "Org.nr: 933 939 871 MVA"
+      ];
+      let fy=yFooter+14; foot.forEach(t=>{doc.text(t, margin, fy); fy+=12;});
+    }
+
     const exportPdf=y=>{
       const doc=new jsPDF({unit:"pt",format:"a4",orientation:"portrait"});
       renderSingleReport(doc,y,db);
@@ -443,56 +470,38 @@ if ((y.result || "").toLowerCase() === "underkjent" && gapHeight > 50) {
       doc.save(filename);
     };
 
-    // ------- PDF: samlerapport (LANDSKAP), så enkeltrapporter (PORTRAIT) ------
     const exportCustomerBundle=(customer,from,to)=>{
-      if(!customer)return alert("Velg kunde");
-      if(!from||!to)return alert("Velg Fra og Til dato");
-
-      // Førstesider i LANDSKAP
+      if(!customer) return alert("Velg kunde");
+      if(!from||!to) return alert("Velg Fra og Til dato");
       const doc=new jsPDF({unit:"pt",format:"a4",orientation:"landscape"});
-      const margin=36, pageW=doc.internal.pageSize.getWidth(), pageH=doc.internal.pageSize.getHeight();
-      const tableW=pageW-margin*2;
+      const margin=36, pageW=doc.internal.pageSize.getWidth(), pageH=doc.internal.pageSize.getHeight(), tableW=pageW-margin*2;
+      const COLS=[{key:"type",label:"Produkt type",pct:0.34},{key:"name",label:"Navn",pct:0.26},{key:"sn",label:"Serienummer",pct:0.16},{key:"date",label:"Kontrolldato",pct:0.12},{key:"res",label:"Resultat",pct:0.12}];
+      const colW=COLS.map(c=>Math.floor(tableW*c.pct)); const colX=[margin]; for(let i=1;i<COLS.length;i++) colX[i]=margin+colW.slice(0,i).reduce((a,b)=>a+b,0);
 
-      // kolonneoppsett – passer i landskap
-      const COLS=[
-        {key:"type",label:"Produkt type",pct:0.34},
-        {key:"name",label:"Navn",pct:0.26},
-        {key:"sn",  label:"Serienummer",pct:0.16},
-        {key:"date",label:"Kontrolldato",pct:0.12},
-        {key:"res", label:"Resultat",pct:0.12}
-      ];
-      const colW=COLS.map(c=>Math.floor(tableW*c.pct));
-      const colX=[margin]; for(let i=1;i<COLS.length;i++) colX[i]=margin+colW.slice(0,i).reduce((a,b)=>a+b,0);
-
-      let y=margin;
-      doc.setFontSize(18); doc.text(`Årskontroller – ${customer.name}`,margin,y); y+=24;
+      let y=margin; doc.setFontSize(18); doc.text(`Årskontroller – ${customer.name}`,margin,y); y+=24;
       doc.setFontSize(11); doc.text(`Periode: ${from} til ${to}`,margin,y); y+=18;
       doc.text(`Kontakt: ${customer.contact||"-"} · ${customer.email||"-"} · ${customer.phone||"-"}`,margin,y); y+=14;
-      const addr=[customer.street,[customer.zip,customer.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
-      doc.text(`Adresse: ${addr}`,margin,y); y+=20;
+      const addr=[customer.street,[customer.zip,customer.city].filter(Boolean).join(" ")].filter(Boolean).join(", "); doc.text(`Adresse: ${addr}`,margin,y); y+=20;
 
-      const drawHeader=()=>{ doc.setDrawColor(180); doc.setFillColor(90,168,255); doc.setTextColor(255);
-        const h=22; COLS.forEach((c,i)=>doc.rect(colX[i],y,colW[i],h,"FD"));
-        doc.setFontSize(11); COLS.forEach((c,i)=>doc.text(c.label,colX[i]+6,y+15));
-        y+=h; doc.setTextColor(0); doc.setFontSize(10);
-      };
-      const newLandscapePage=()=>{ doc.addPage("a4","landscape"); y=margin; drawHeader(); };
-
+      const drawHeader=()=>{doc.setDrawColor(180); doc.setFillColor(90,168,255); doc.setTextColor(255); const h=22; COLS.forEach((c,i)=>doc.rect(colX[i],y,colW[i],h,"FD")); doc.setFontSize(11); COLS.forEach((c,i)=>doc.text(c.label,colX[i]+6,y+15)); y+=h; doc.setTextColor(0); doc.setFontSize(10);};
+      const newLandscapePage=()=>{doc.addPage("a4","landscape"); y=margin; drawHeader();};
       drawHeader();
 
-      const trim=(txt,max)=>{ if(!txt) return ""; const tMax=Math.max(10,max-8); if(doc.getTextWidth(txt)<=tMax) return txt;
-        let s=txt; while(doc.getTextWidth(s+"…")>tMax && s.length>0) s=s.slice(0,-1); return s+"…"; };
+      const trim=(txt,max)=>{if(!txt)return"";const tMax=Math.max(10,max-8); if(doc.getTextWidth(txt)<=tMax)return txt; let s=txt; while(doc.getTextWidth(s+"…")>tMax&&s.length>0)s=s.slice(0,-1); return s+"…";};
 
       const inds=db.individuals.filter(i=>i.customerId===customer.id);
-      const inRange=db.checks.filter(yc=>inds.some(i=>i.id===yc.individualId))
-        .filter(yc=>yc.date>=from && yc.date<=to).sort((a,b)=>b.date.localeCompare(a.date));
+      const inRange=db.checks
+        .filter(yc=>inds.some(i=>i.id===yc.individualId))
+        .filter(yc=>yc.date>=from && yc.date<=to)
+        .sort((a,b)=>b.date.localeCompare(a.date));
+
       const lastByInd={}; for(const yc of inRange) if(!lastByInd[yc.individualId]) lastByInd[yc.individualId]=yc;
 
       const rowH=22;
       inds.forEach(indiv=>{
         const yc=lastByInd[indiv.id];
         if(y>pageH-80) newLandscapePage();
-        const isUnder=yc && (yc.result||"").toLowerCase()==="underkjent";
+        const isUnder=yc&&(yc.result||"").toLowerCase()==="underkjent";
         if(isUnder) doc.setFillColor(255,235,238);
         COLS.forEach((c,i)=>doc.rect(colX[i],y,colW[i],rowH,isUnder?"FD":"S"));
         const vals={
@@ -502,15 +511,19 @@ if ((y.result || "").toLowerCase() === "underkjent" && gapHeight > 50) {
           date:yc?yc.date:"–",
           res:yc?yc.result:"–"
         };
-        COLS.forEach((c,i)=>{ if(c.key==="res"&&isUnder) doc.setTextColor(178,34,34);
-          doc.text(String(vals[c.key]??""),colX[i]+6,y+15);
+        COLS.forEach((c,i)=>{
+          if(c.key==="res"&&isUnder) doc.setTextColor(178,34,34);
+          doc.text(String(vals[c.key]??""), colX[i]+6, y+15);
           if(c.key==="res"&&isUnder) doc.setTextColor(0,0,0);
         });
         y+=rowH;
       });
 
-      // Deretter hver rapport i PORTRETT
-      inRange.reverse().forEach(yc=>{ doc.addPage("a4","portrait"); renderSingleReport(doc,yc,db); });
+      // Append enkeltrapporter (portrett)
+      inRange.reverse().forEach(yc=>{
+        doc.addPage("a4","portrait");
+        renderSingleReport(doc,yc,db);
+      });
 
       const fname=`samlerapport_${(customer.name||"kunde").replace(/[^a-z0-9]+/gi,"-").toLowerCase()}_${from.replace(/-/g,"")}-${to.replace(/-/g,"")}.pdf`;
       doc.save(fname);
@@ -535,12 +548,214 @@ if ((y.result || "").toLowerCase() === "underkjent" && gapHeight > 50) {
       window.location.href=`mailto:${encodeURIComponent(mail)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
     };
 
-    // visning
-    return e(F,null,
-      (view==="customers")&&e(CustomersView,{db,cust,setCust,setView,setCurrentCustomer,exportBackup,importBackup,addCustomer,address,updateCustomer,deleteCustomer}),
-      (view==="customerDetail")&&currentCustomer&&e(CustomerDetailView,{db,currentCustomer,setView,ind,setInd,addIndividual,cleanType,setCurrentCustomer,setCurrentIndividual:update=>update,updateIndividual,deleteIndividual,address,exportPdf,deleteCheck,startChecklist,bundleFrom,bundleTo,setBundleFrom,setBundleTo,exportCustomerBundle,mailCustomerBundle}),
-      (view==="reports")&&currentIndividual&&e(ReportsView,{db,currentIndividual,setView,exportPdf,deleteCheck}),
-      (view==="newCheck")&&currentIndividual&&e(NewCheckView,{db,currentIndividual,setView,check,setCheck,items,setItems,photo,setPhoto,readFileAsDataURL,saveCheck})
+    /* ---- Views ---- */
+    function SettingsCard(){
+      return Card({title:"Innstillinger"},
+        e(GitHubSettings,{
+          cfg:ghCfg,
+          setCfg:setGhCfg,
+          onLoad:(cfg)=>loadFromGitHub(cfg,setDb,setSuppress),
+          onSave:(cfg,manual)=>saveToGitHub(cfg,db).then(()=>{ if(manual) alert("Data lagret til GitHub."); })
+        }),
+        e("div",{style:{display:"flex",gap:8,marginTop:8}},
+          e(BtnSec,{onClick:exportBackup},"Eksporter backup (JSON)"),
+          e("label",{className:"btn secondary",style:{display:"inline-flex",alignItems:"center",gap:8,cursor:"pointer"}}, "Importer backup",
+            e("input",{type:"file",accept:"application/json",style:{display:"none"},onChange:ev=>{const f=ev.target.files&&ev.target.files[0]; if(f) importBackup(f);}})
+          )
+        )
+      );
+    }
+
+    function CustomersView(){
+      return e("div",{className:"grid two"},
+        e(SettingsCard,{}),
+        e(Card,{title:"Kunder"},
+          db.customers.length===0?e("div",{className:"small"},"Ingen kunder enda."):null,
+          e("ul",{style:{listStyle:"none",padding:0,margin:0}},
+            db.customers.map(c=>e("li",{key:c.id,className:"kundeitem"},
+              e("div",{onClick:()=>{setCurrentCustomer(c); setView("customerDetail");},style:{cursor:"pointer"}},
+                e("div",{style:{fontWeight:800}},c.name),
+                e("div",{className:"small"},address(c)),
+                e("div",{className:"small"},`Kontakt: ${c.contact||"-"} · ${c.phone||"-"}`)
+              ),
+              e("div",{style:{display:"flex",gap:6}},
+                e(BtnSec,{onClick:()=>{const name=prompt("Kundenavn",c.name); if(name===null)return;
+                  const contact=prompt("Kontaktperson",c.contact||""); if(contact===null)return;
+                  const phone=prompt("Telefon",c.phone||""); if(phone===null)return;
+                  const email=prompt("E-post",c.email||""); if(email===null)return;
+                  const orgnr=prompt("Org.nr",c.orgnr||""); if(orgnr===null)return;
+                  const street=prompt("Gateadresse",c.street||""); if(street===null)return;
+                  const zip=prompt("Postnr",c.zip||""); if(zip===null)return;
+                  const city=prompt("Poststed",c.city||""); if(city===null)return;
+                  updateCustomer({...c,name,contact,phone,email,orgnr,street,zip,city});}},"Rediger"),
+                e(BtnDanger,{onClick:()=>deleteCustomer(c.id)},"Slett")
+              )
+            ))
+          ),
+        ),
+        e(Card,{title:"Ny kunde"},
+          e("div",{className:"row three"},
+            e("div",null,L("Kundenavn"),Input({value:cust.name,onChange:ev=>setCust({...cust,name:ev.target.value})})),
+            e("div",null,L("Kontaktperson"),Input({value:cust.contact,onChange:ev=>setCust({...cust,contact:ev.target.value})})),
+            e("div",null,L("Telefon"),Input({value:cust.phone,onChange:ev=>setCust({...cust,phone:ev.target.value})}))
+          ),
+          e("div",{className:"row three"},
+            e("div",null,L("E-post"),Input({value:cust.email,onChange:ev=>setCust({...cust,email:ev.target.value})})),
+            e("div",null,L("Org.nr"),Input({value:cust.orgnr,onChange:ev=>setCust({...cust,orgnr:ev.target.value})})),
+            e("div",null) // tom for layout
+          ),
+          e("div",{className:"row three"},
+            e("div",null,L("Gateadresse"),Input({value:cust.street,onChange:ev=>setCust({...cust,street:ev.target.value})})),
+            e("div",null,L("Postnr"),Input({value:cust.zip,onChange:ev=>setCust({...cust,zip:ev.target.value})})),
+            e("div",null,L("Poststed"),Input({value:cust.city,onChange:ev=>setCust({...cust,city:ev.target.value})}))
+          ),
+          e("div",{style:{marginTop:10}}, e(Button,{onClick:addCustomer},"Lagre kunde"))
+        )
+      );
+    }
+
+    function CustomerDetailView(){
+      const inds=db.individuals.filter(i=>i.customerId===currentCustomer.id);
+      const checks=db.checks.filter(y=>inds.some(i=>i.id===y.individualId)).sort((a,b)=>b.date.localeCompare(a.date));
+      return e("div",{className:"grid two"},
+        e(Card,{title:"Kunde"},
+          e("div",{style:{fontWeight:800,fontSize:18}},currentCustomer.name),
+          e("div",{className:"small"},address(currentCustomer)),
+          e("div",{className:"small"},`Kontakt: ${currentCustomer.contact||"-"} · ${currentCustomer.phone||"-"}`),
+          e("div",{className:"small"},`E-post: ${currentCustomer.email||"-"} · Org.nr: ${currentCustomer.orgnr||"-"}`),
+          e("div",{className:"divider"}),
+          e(BtnSec,{onClick:()=>setView("customers")},"Tilbake"),
+          e("div",{className:"divider"}),
+          e("div",null,e("strong",null,"Samlerapport (PDF) – landskap")),
+          e("div",{className:"row two",style:{marginTop:8}},
+            e("div",null,L("Fra dato"),Input({type:"date",value:bundleFrom,onChange:ev=>setBundleFrom(ev.target.value)})),
+            e("div",null,L("Til dato"),Input({type:"date",value:bundleTo,onChange:ev=>setBundleTo(ev.target.value)}))
+          ),
+          e("div",{style:{display:"flex",gap:8,marginTop:8}},
+            e(Button,{onClick:()=>exportCustomerBundle(currentCustomer,bundleFrom,bundleTo)},"Lag samlerapport"),
+            e(BtnSec,{onClick:()=>mailCustomerBundle(currentCustomer,bundleFrom,bundleTo)},"Lag og åpne e-post")
+          )
+        ),
+
+        e(Card,{title:"Legg til individ"},
+          e("div",{className:"row two"},
+            e("div",null,L("Navn / betegnelse"),Input({value:ind.name,onChange:ev=>setInd({...ind,name:ev.target.value})})),
+            e("div",null,L("Serienummer"),Input({value:ind.serial,onChange:ev=>setInd({...ind,serial:ev.target.value})}))
+          ),
+          e("div",{className:"row two"},
+            e("div",null,L("Type produkt"), e(ProductTypeSelect,{value:ind.type,onChange:ev=>setInd({...ind,type:ev.target.value})})),
+            e("div",null,L("Notater"),TextArea({rows:3,value:ind.notes,onChange:ev=>setInd({...ind,notes:ev.target.value})}))
+          ),
+          e("div",{style:{marginTop:10}}, e(Button,{onClick:addIndividual},"Lagre individ"))
+        ),
+
+        e(Card,{title:"Individer",style:{gridColumn:"1 / -1"}},
+          inds.length===0?e("div",{className:"small"},"Ingen individer registrert."):null,
+          e("ul",{style:{listStyle:"none",padding:0,margin:0}},
+            inds.map(i=>{
+              const last=db.checks.filter(y=>y.individualId===i.id).sort((a,b)=>b.date.localeCompare(a.date))[0];
+              return e("li",{key:i.id,className:"kundeitem"},
+                e("div",null,
+                  e("div",{style:{fontWeight:800}},i.name),
+                  e("div",{className:"small"},`${cleanType(i.type)} ${i.serial?`· SN: ${i.serial}`:""}`),
+                  e("div",{className:"small"},`Sist kontroll: ${last?`${last.date} – ${last.result}`:"–"}`)
+                ),
+                e("div",{style:{display:"flex",gap:6}},
+                  e(BtnSec,{onClick:()=>{setCurrentIndividual(i); setView("reports");}},"Se rapporter"),
+                  e(Button,{onClick:()=>startChecklist(i)},"Ny årskontroll"),
+                  e(BtnSec,{onClick:()=>{const name=prompt("Navn",i.name); if(name===null)return;
+                    const type=prompt("Type",i.type); if(type===null)return;
+                    const serial=prompt("Serienummer",i.serial||""); if(serial===null)return;
+                    const notes=prompt("Notater",i.notes||""); if(notes===null)return;
+                    updateIndividual({...i,name,type,serial,notes});}},"Rediger"),
+                  e(BtnDanger,{onClick:()=>deleteIndividual(i.id)},"Slett")
+                )
+              );
+            })
+          )
+        ),
+
+        checks.length>0?e(Card,{title:"Siste rapporter",style:{gridColumn:"1 / -1"}},
+          ...checks.slice(0,5).map(y=>e("div",{key:y.id,className:"kundeitem"},
+            e("div",null,
+              e("div",{style:{fontWeight:700}},`${y.date} – ${y.result}`),
+              e("div",{className:"small"},db.individuals.find(i=>i.id===y.individualId)?.name||""),
+              y.photo?e("img",{src:y.photo,className:"thumb",alt:"Vedlagt bilde"}):null
+            ),
+            e("div",{style:{display:"flex",gap:6}},
+              e(BtnSec,{onClick:()=>exportPdf(y)},"PDF"),
+              e(BtnDanger,{onClick:()=>deleteCheck(y.id)},"Slett")
+            )
+          ))
+        ):null
+      );
+    }
+
+    function ReportsView(){
+      const list=db.checks.filter(c=>c.individualId===currentIndividual.id).sort((a,b)=>b.date.localeCompare(a.date));
+      return e(Card,{title:`Rapporter – ${currentIndividual.name}`},
+        list.length===0?e("div",{className:"small"},"Ingen rapporter."):null,
+        ...list.map(y=>e("div",{key:y.id,className:"kundeitem"},
+          e("div",null,
+            e("div",{style:{fontWeight:700}},`${y.date} – ${y.result}`),
+            e("div",{className:"small"},y.inspector||""),
+            y.photo?e("img",{src:y.photo,className:"thumb",alt:"Vedlagt bilde"}):null
+          ),
+          e("div",{style:{display:"flex",gap:6}},
+            e(BtnSec,{onClick:()=>exportPdf(y)},"PDF"),
+            e(BtnDanger,{onClick:()=>deleteCheck(y.id)},"Slett")
+          )
+        )),
+        e("div",{style:{marginTop:10}}, e(BtnSec,{onClick:()=>setView("customerDetail")},"Tilbake"))
+      );
+    }
+
+    function NewCheckView(){
+      const anm=items.reduce((a,b)=>a+(b.status==="Anmerking"?1:0),0);
+      return e(Card,{title:`Ny årskontroll – ${currentIndividual?currentIndividual.name:""}`},
+        e("div",{className:"row two"},
+          e("div",null,L("Dato"),Input({type:"date",value:check.date,onChange:ev=>setCheck({...check,date:ev.target.value})})),
+          e("div",null,L("Kontrollør"),Input({value:check.inspector,onChange:ev=>setCheck({...check,inspector:ev.target.value})}))
+        ),
+        e("div",{className:"row two"},
+          e("div",null,L("Resultat"),
+            e(Choices,{name:"res",value:check.result,onChange:v=>setCheck({...check,result:v}),
+              labels:[["OK","OK","ok"],["Underkjent","Underkjent","warn"]]}
+            )
+          ),
+          e("div",null,L("Notater"),TextArea({rows:3,value:check.notes,onChange:ev=>setCheck({...check,notes:ev.target.value})}))
+        ),
+        e("div",{className:"small",style:{marginTop:6}},`Anmerking: ${anm}`),
+        e("div",{className:"divider"}),
+        e("div",{style:{fontWeight:700,marginBottom:6}},"Vedlegg (valgfritt)"),
+        e("div",{style:{display:"flex",alignItems:"center",gap:10,marginBottom:10}},
+          e("input",{type:"file",accept:"image/*",onChange:async ev=>{const f=ev.target.files&&ev.target.files[0]; if(!f)return; const data=await readFileAsDataURL(f); setPhoto(data);}}),
+          photo?e("img",{src:photo,className:"thumb",alt:"Vedlagt bilde"}):null
+        ),
+        e("div",{className:"divider"}),
+        e("div",{style:{fontWeight:700,marginBottom:6}},"Sjekkliste"),
+        ...items.map((it,idx)=>e("div",{key:it.key,className:"kundeitem",style:{alignItems:"flex-start",gap:12}},
+          e("div",{style:{flex:1}},
+            e("div",{className:"small",style:{fontWeight:700}},it.label),
+            Input({style:{marginTop:8},placeholder:"Notat (valgfritt)",value:it.notes,onChange:ev=>setItems(p=>p.map((q,i)=>i===idx?{...q,notes:ev.target.value}:q))})
+          ),
+          e(Choices,{name:`st-${idx}`,value:it.status,onChange:v=>setItems(p=>p.map((q,i)=>i===idx?{...q,status:v}:q)),labels:[["OK","OK","ok"],["Anmerking","Anmerking","warn"]]})
+        )),
+        e("div",{style:{display:"flex",gap:8,marginTop:10}},
+          e(BtnSec,{onClick:()=>setView("customerDetail")},"Avbryt"),
+          e(Button,{onClick:saveCheck},"Lagre kontroll")
+        )
+      );
+    }
+
+    /* ---- Router-render ---- */
+    ReactDOM.createRoot(document.getElementById("root")).render(
+      e(F,null,
+        view==="customers" && e(CustomersView),
+        view==="customerDetail" && currentCustomer && e(CustomerDetailView),
+        view==="reports" && currentIndividual && e(ReportsView),
+        view==="newCheck" && currentIndividual && e(NewCheckView)
+      )
     );
   }
 
