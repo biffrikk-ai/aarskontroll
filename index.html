@@ -49,16 +49,16 @@
       const { jsPDF } = (window.jspdf || {});
       const e = React.createElement;
 
-      // helpers
-      const LS="aarskontroll_store_v21";
+      // ==== helpers ====
+      const LS="aarskontroll_store_v22";
       const load=()=>{try{return JSON.parse(localStorage.getItem(LS)||"{}")}catch{return{}}};
       const debouncedSave=(()=>{let t=null;return s=>{clearTimeout(t);t=setTimeout(()=>localStorage.setItem(LS,JSON.stringify(s)),300)}})();
       const uid=()=>Math.random().toString(36).slice(2)+Date.now().toString(36);
       const today=()=>new Date().toISOString().slice(0,10);
-      const cleanType=(t="")=>String(t).replace(/EN\\s*\\d+(\\s*\\/\\s*EN\\d+)*/gi,"").replace(/[–-]\\s*/g,"").trim();
+      const cleanType=(t="")=>String(t).replace(/EN\s*\d+(\s*\/\s*EN\d+)*/gi,"").replace(/[–-]\s*/g,"").trim();
       const readFileAsDataURL=f=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)});
 
-      // sjekklister
+      // ==== sjekklister (forhåndsdefinert) ====
       const CHECKLISTS={
         "EN361 / EN358 / EN813 – Sele":[
           "Merkelapp/ID lesbar og samsvarer med standard",
@@ -69,43 +69,50 @@
           "Polstring/festepunkter i god stand",
           "Produsentens etikett/sertifisering lesbar",
           "Utstyr rent/tørt/korrekt lagret",
-          "Ingen tegn til overbelastning/fall/modifikasjon"],
+          "Ingen tegn til overbelastning/fall/modifikasjon"
+        ],
         "EN355 – Fangline / Falldemper":[
-          "Merkelapp/ID lesbar – EN355","Falldemper ikke utløst/forlenget",
-          "Line uten kutt/slitasje/UV/kjemisk skade","Sømmer/termineringer hele",
-          "Kroker/karabiner lukker og ikke deformert","Visuell fallindikator ikke aktivert",
-          "Lengde og type passer bruksområdet"],
+          "Merkelapp/ID lesbar – EN355","Falldemper ikke utløst/forlenget","Line uten kutt/slitasje/UV/kjemisk skade",
+          "Sømmer/termineringer hele","Kroker/karabiner lukker og ikke deformert","Visuell fallindikator ikke aktivert",
+          "Lengde og type passer bruksområdet"
+        ],
         "EN360 – Fallblokk":[
-          "Merkelapp lesbar – EN360","Hus uten sprekker/deformasjon/skade",
-          "Wire/bånd uten rust/oppflising/kutt/bøying","Innspoling jevn uten rykk",
-          "Brems løser normalt ved trekkprøve","Krok med sikkerhetslås ok",
-          "Fallindikator viser ikke utløsning","Siste kontrollmerke oppdatert"],
+          "Merkelapp lesbar – EN360","Hus uten sprekker/deformasjon/skade","Wire/bånd uten rust/oppflising/kutt/bøying",
+          "Innspoling jevn uten rykk","Brems løser normalt ved trekkprøve","Krok med sikkerhetslås ok",
+          "Fallindikator viser ikke utløsning","Siste kontrollmerke oppdatert"
+        ],
         "EN353-2 – Linesystem / Vertikal line":[
           "Merkelapp og produsentinfo lesbar – EN353-2","Wire/tau uten kutt/slitasje/oppflising/rust",
           "Løpevogn beveger seg fritt og låser ved falltest","Koblingspunkter og kroker fungerer",
-          "Forankringspunkt korrekt og uten skade","Endefester intakte og ikke rustne","System komplett iht. spesifikasjon"],
+          "Forankringspunkt korrekt og uten skade","Endefester intakte og ikke rustne","System komplett iht. spesifikasjon"
+        ],
         "EN358 – Støttesystem":[
           "Merkelapp/ID samsvarer med EN358","Tau/belte uten kutt/rifter/UV/kjemisk påvirkning",
           "Justeringsmekanismer fungerer og holder","Kroker/karabiner lukker og låser korrekt",
-          "Sømmer/termineringer uten skade","Bruksområde/merking samsvarer med bruk"],
+          "Sømmer/termineringer uten skade","Bruksområde/merking samsvarer med bruk"
+        ],
         "EN354 – Forbindelsesline":[
           "Merkelapp lesbar – EN354","Tau uten kutt/rifter/UV/kjemisk skade",
-          "Endefester/sømmer intakte","Kroker fungerer og lukker korrekt","Lengde/type samsvarer med bruk"],
+          "Endefester/sømmer intakte","Kroker fungerer og lukker korrekt","Lengde/type samsvarer med bruk"
+        ],
         "EN795 – Forankringsanordning":[
           "Merkelapp og produsentinfo lesbar – EN795","Forankringspunkt fast – uten sprekker/rust/deformasjon",
           "Bolter/fester stramme uten korrosjon","Bevegelige deler fungerer fritt",
-          "Plassering korrekt i forhold til arbeid","Kapasitet/WLL iht. dokumentasjon"],
+          "Plassering korrekt i forhold til arbeid","Kapasitet/WLL iht. dokumentasjon"
+        ],
         "EN362 – Koblingsstykke / Karabiner":[
           "Merkelapp/merking lesbar – EN362","Låsemekanisme fungerer – åpner/lukker korrekt",
-          "Fjærspenning normal – lukker automatisk","Ingen rust/riper/deformasjoner","Funksjon uten fastklemming"],
+          "Fjærspenning normal – lukker automatisk","Ingen rust/riper/deformasjoner","Funksjon uten fastklemming"
+        ],
         "EN341 – Nedfirings- / Redningsutstyr":[
           "Merkelapp/sertifikat lesbar – EN341","Hus/mekanisme uten skade/korrosjon",
           "Tau/wire uten skader/rifter/knekk","Bremsemekanisme fungerer under test",
-          "Kroker/karabiner intakte og funksjonelle","Lengde samsvarer med spesifikasjon","Kontrolldato oppdatert"]
+          "Kroker/karabiner intakte og funksjonelle","Lengde samsvarer med spesifikasjon","Kontrolldato oppdatert"
+        ]
       };
       const PRODUCT_TYPES=Object.keys(CHECKLISTS);
 
-      // små komponenter
+      // ==== små UI-komponenter ====
       const Button=p=>e("button",{className:"btn",...p},p.children);
       const BtnSec=p=>e("button",{className:"btn secondary",...p},p.children);
       const BtnDanger=p=>e("button",{className:"btn danger",...p},p.children);
@@ -115,6 +122,7 @@
       const TextArea=p=>e("textarea",{className:"input",...p});
       const Select=p=>e("select",{className:"input",...p});
 
+      // ==== hovedapp ====
       function App(){
         const [db,setDb]=React.useState(()=>({customers:[],individuals:[],checks:[],items:[],...load()}));
         React.useEffect(()=>debouncedSave(db),[db]);
@@ -278,7 +286,8 @@
             e("div",{style:{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}},
               e(BtnSec,{onClick:exportBackup},"Eksporter backup (JSON)"),
               e("label",{className:"btn secondary",style:{display:"inline-flex",alignItems:"center",gap:8,cursor:"pointer"}},
-                "Importer backup", e("input",{type:"file",accept:"application/json",style:{display:"none"},
+                "Importer backup",
+                e("input",{type:"file",accept:"application/json",style:{display:"none"},
                   onChange:ev=>{const f=ev.target.files&&ev.target.files[0]; if(f) importBackup(f);}})
               )
             ),
@@ -451,20 +460,16 @@
         );
 
         // render
-        ReactDOM.createRoot(document.getElementById("root")).render(e(function Main(){
-          const [v,setV]=React.useState("customers");
-          const [custSel,setCustSel]=React.useState(null);
-          const [indSel,setIndSel]=React.useState(null);
-          // sync med "ekte" state for enkelhet
-          React.useEffect(()=>{
-            // stygge, men enkle bindings – vi bruker events for å bytte view
-          },[]);
-          // Proxy til App: vi rendrer App direkte:
-          return e(App);
-        }));
+        return e(React.Fragment,null,
+          view==="customers"      && e(CustomersView),
+          view==="customerDetail" && currentCustomer && e(CustomerDetailView),
+          view==="reports"        && currentIndividual && e(ReportsView),
+          view==="newCheck"       && currentIndividual && e(NewCheckView)
+        );
       }
 
-      App();
+      // start app
+      ReactDOM.createRoot(document.getElementById("root")).render(e(App));
     })();
   </script>
 </body>
