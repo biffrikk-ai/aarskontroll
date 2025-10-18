@@ -33,7 +33,7 @@
     .choice input{position:absolute;opacity:0;pointer-events:none}
     .choice label{
       display:inline-block; border:1px solid var(--stroke); border-radius:10px; padding:8px 12px; cursor:pointer; user-select:none;
-      background:#fff; min-width:90px; text-align:center; font-weight:600;
+      background:#fff; min-width:110px; text-align:center; font-weight:600;
     }
     .choice input:checked + label{border-color:#5aa8ff; box-shadow:0 0 0 3px rgba(90,168,255,.2)}
     .choice.ok input:checked + label{background:#eaf6ff}
@@ -60,7 +60,7 @@
     const e = React.createElement, F = React.Fragment;
 
     // ===== Helpers & data =====
-    const LS="aarskontroll_store_v27";
+    const LS="aarskontroll_store_v29";
     const load=()=>{try{return JSON.parse(localStorage.getItem(LS)||"{}")}catch{return{}}};
     const debouncedSave=(()=>{let t=null;return s=>{clearTimeout(t);t=setTimeout(()=>localStorage.setItem(LS,JSON.stringify(s)),300)}})();
     const uid=()=>Math.random().toString(36).slice(2)+Date.now().toString(36);
@@ -145,7 +145,6 @@
     // Radio-bokser for OK/Anmerking per punkt
     function StatusBoxes({ name, value, onChange }) {
       return React.createElement("div",{className:"choices"},
-        // OK
         React.createElement("div",{className:"choice ok"},
           React.createElement("input",{
             id:`${name}-ok`, type:"radio", name, value:"OK", checked:value==="OK",
@@ -153,7 +152,6 @@
           }),
           React.createElement("label",{htmlFor:`${name}-ok`}, "OK")
         ),
-        // Anmerking
         React.createElement("div",{className:"choice warn"},
           React.createElement("input",{
             id:`${name}-anm`, type:"radio", name, value:"Anmerking", checked:value==="Anmerking",
@@ -240,7 +238,11 @@
       );
     }
 
-    function CustomerDetailView({db,currentCustomer,setView,ind,setInd,addIndividual,cleanType,setCurrentIndividual,updateIndividual,deleteIndividual,address,exportPdf,deleteCheck, startChecklist}) {
+    function CustomerDetailView({
+      db,currentCustomer,setView,ind,setInd,addIndividual,cleanType,setCurrentIndividual,
+      updateIndividual,deleteIndividual,address,exportPdf,deleteCheck, startChecklist,
+      bundleFrom,bundleTo,setBundleFrom,setBundleTo,exportCustomerBundle,mailCustomerBundle
+    }) {
       const inds=db.individuals.filter(i=>i.customerId===currentCustomer.id);
       const checks=db.checks.filter(y=>inds.some(i=>i.id===y.individualId)).sort((a,b)=>b.date.localeCompare(a.date));
       return e("div",{className:"grid two"},
@@ -250,311 +252,22 @@
           e("div",{className:"small"}, `Kontakt: ${currentCustomer.contact||"-"} · ${currentCustomer.phone||"-"}`),
           e("div",{className:"small"}, `E-post: ${currentCustomer.email||"-"} · Org.nr: ${currentCustomer.orgnr||"-"}`),
           e("div",{className:"divider"}),
-          e(BtnSec,{onClick:()=>setView("customers")},"Tilbake")
+          e(BtnSec,{onClick:()=>setView("customers")},"Tilbake"),
+          e("div",{className:"divider"}),
+          e("div",null, e("strong",null,"Samlerapport (PDF)")),
+          e("div",{className:"row two",style:{marginTop:8}},
+            e("div",null, L("Fra dato"), Input({type:"date",value:bundleFrom,onChange:ev=>setBundleFrom(ev.target.value)})),
+            e("div",null, L("Til dato"),  Input({type:"date",value:bundleTo,onChange:ev=>setBundleTo(ev.target.value)}))
+          ),
+          e("div",{style:{display:"flex",gap:8,marginTop:8}},
+            e(Button,{onClick:()=>exportCustomerBundle(currentCustomer,bundleFrom,bundleTo)},"Lag samlerapport"),
+            e(BtnSec,{onClick:()=>mailCustomerBundle(currentCustomer,bundleFrom,bundleTo)},"Lag og åpne e-post")
+          )
         ),
         e(Card,{title:"Legg til individ"},
           e("div",{className:"row two"},
             e("div",null,L("Navn / betegnelse"),Input({value:ind.name,onChange:ev=>setInd({...ind,name:ev.target.value})})),
             e("div",null,L("Serienummer"),Input({value:ind.serial,onChange:ev=>setInd({...ind,serial:ev.target.value})}))
           ),
-          e("div",{className:"row two"},
-            e("div",null,L("Type produkt"),
-              e(ProductTypeSelect,{value:ind.type,onChange:(ev)=>setInd({...ind,type:ev.target.value})})
-            ),
-            e("div",null,L("Notater"),TextArea({rows:3,value:ind.notes,onChange:ev=>setInd({...ind,notes:ev.target.value})}))
-          ),
-          e("div",{style:{marginTop:10}}, e("button",{className:"btn",onClick:addIndividual},"Lagre individ"))
-        ),
-        e(Card,{title:"Individer",style:{gridColumn:"1 / -1"}},
-          inds.length===0?e("div",{className:"small"},"Ingen individer registrert."):null,
-          e("ul",{style:{listStyle:"none",padding:0,margin:0}},
-            inds.map(i=>{
-              const last=db.checks.filter(y=>y.individualId===i.id).sort((a,b)=>b.date.localeCompare(a.date))[0];
-              return e("li",{key:i.id,className:"kundeitem"},
-                e("div",null,
-                  e("div",{style:{fontWeight:800}}, i.name),
-                  e("div",{className:"small"}, `${cleanType(i.type)} ${i.serial?`· SN: ${i.serial}`:""}`),
-                  e("div",{className:"small"}, `Sist kontroll: ${last?`${last.date} – ${last.result}`:"–"}`)
-                ),
-                e("div",{style:{display:"flex",gap:6}},
-                  e(BtnSec,{onClick:()=>{setCurrentIndividual(i); setView("reports");}},"Se rapporter"),
-                  e(Button,{onClick:()=>startChecklist(i)},"Ny årskontroll"),
-                  e(BtnSec,{onClick:()=>{const name=prompt("Navn",i.name); if(name===null)return;
-                    const type=prompt("Type",i.type); if(type===null)return;
-                    const serial=prompt("Serienummer",i.serial||""); if(serial===null)return;
-                    const notes=prompt("Notater",i.notes||""); if(notes===null)return;
-                    updateIndividual({...i,name,type,serial,notes});
-                  }},"Rediger"),
-                  e(BtnDanger,{onClick:()=>deleteIndividual(i.id)},"Slett")
-                )
-              );
-            })
-          )
-        ),
-        checks.length>0?e(Card,{title:"Siste rapporter",style:{gridColumn:"1 / -1"}},
-          ...checks.slice(0,5).map(y=>e("div",{key:y.id,className:"kundeitem"},
-            e("div",null,
-              e("div",{style:{fontWeight:700}}, `${y.date} – ${y.result}`),
-              e("div",{className:"small"}, db.individuals.find(i=>i.id===y.individualId)?.name||""),
-              y.photo?e("img",{src:y.photo,className:"thumb",alt:"Vedlagt bilde"}):null
-            ),
-            e("div",{style:{display:"flex",gap:6}},
-              e(BtnSec,{onClick:()=>exportPdf(y)},"PDF"),
-              e(BtnDanger,{onClick:()=>deleteCheck(y.id)},"Slett")
-            )
-          ))
-        ):null
-      );
-    }
-
-    function ReportsView({db,currentIndividual,setView,exportPdf,deleteCheck}) {
-      const list=db.checks.filter(c=>c.individualId===currentIndividual.id).sort((a,b)=>b.date.localeCompare(a.date));
-      return e(Card,{title:`Rapporter – ${currentIndividual.name}`},
-        list.length===0?e("div",{className:"small"},"Ingen rapporter."):null,
-        ...list.map(y=>e("div",{key:y.id,className:"kundeitem"},
-          e("div",null,
-            e("div",{style:{fontWeight:700}}, `${y.date} – ${y.result}`),
-            e("div",{className:"small"}, y.inspector||""),
-            y.photo?e("img",{src:y.photo,className:"thumb",alt:"Vedlagt bilde"}):null
-          ),
-          e("div",{style:{display:"flex",gap:6}},
-            e(BtnSec,{onClick:()=>exportPdf(y)},"PDF"),
-            e(BtnDanger,{onClick:()=>deleteCheck(y.id)},"Slett")
-          )
-        )),
-        e("div",{style:{marginTop:10}}, e(BtnSec,{onClick:()=>setView("customerDetail")},"Tilbake"))
-      );
-    }
-
-    function NewCheckView({db,currentIndividual,setView,check,setCheck,items,setItems,photo,setPhoto,readFileAsDataURL,saveCheck}) {
-      const anmCount = items.reduce((a,b)=>a+(b.status==="Anmerking"?1:0),0);
-      return e(Card,{title:`Ny årskontroll – ${currentIndividual?currentIndividual.name:""}`},
-        e("div",{className:"row two"},
-          e("div",null,L("Dato"),Input({type:"date",value:check.date,onChange:ev=>setCheck({...check,date:ev.target.value})})),
-          e("div",null,L("Kontrollør"),Input({value:check.inspector,onChange:ev=>setCheck({...check,inspector:ev.target.value})}))
-        ),
-        e("div",{className:"row two"},
-          e("div",null,L("Resultat"), e(ResultBoxes,{value:check.result,onChange:(v)=>setCheck({...check,result:v})})),
-          e("div",null,L("Notater"),TextArea({rows:3,value:check.notes,onChange:ev=>setCheck({...check,notes:ev.target.value})}))
-        ),
-        e("div",{className:"small",style:{marginTop:6}}, `Anmerking: ${anmCount}`),
-        e("div",{className:"divider"}),
-        e("div",{style:{fontWeight:700,marginBottom:6}},"Vedlegg (valgfritt)"),
-        e("div",{style:{display:"flex",alignItems:"center",gap:10,marginBottom:10}},
-          e("input",{type:"file",accept:"image/*",onChange:async ev=>{const f=ev.target.files&&ev.target.files[0]; if(!f)return; const data=await readFileAsDataURL(f); setPhoto(data);}}),
-          photo?e("img",{src:photo,className:"thumb",alt:"Vedlagt bilde"}):null
-        ),
-        e("div",{className:"divider"}),
-        e("div",{style:{fontWeight:700,marginBottom:6}},"Sjekkliste"),
-        ...items.map((it,idx)=>e("div",{key:it.key,className:"kundeitem",style:{alignItems:"flex-start",gap:12}},
-          e("div",{style:{flex:1}},
-            e("div",{className:"small",style:{fontWeight:700}}, it.label),
-            Input({style:{marginTop:8},placeholder:"Notat (valgfritt)",value:it.notes,onChange:ev=>setItems(p=>p.map((q,i)=>i===idx?{...q,notes:ev.target.value}:q))})
-          ),
-          e(StatusBoxes,{
-            name:`st-${idx}`,
-            value:it.status,
-            onChange:(v)=>setItems(p=>p.map((q,i)=>i===idx?{...q,status:v}:q))
-          })
-        )),
-        e("div",{style:{display:"flex",gap:8,marginTop:10}},
-          e(BtnSec,{onClick:()=>setView("customerDetail")},"Avbryt"),
-          e(Button,{onClick:saveCheck},"Lagre kontroll")
-        )
-      );
-    }
-
-    // ===== App =====
-    function App(){
-      const [db,setDb]=React.useState(()=>({customers:[],individuals:[],checks:[],items:[],...load()}));
-      React.useEffect(()=>debouncedSave(db),[db]);
-
-      const [view,setView]=React.useState("customers");
-      const [currentCustomer,setCurrentCustomer]=React.useState(null);
-      const [currentIndividual,setCurrentIndividual]=React.useState(null);
-
-      const [cust,setCust]=React.useState({name:"",contact:"",phone:"",email:"",orgnr:"",street:"",zip:"",city:""});
-      const [ind,setInd]=React.useState({name:"",type:"",serial:"",notes:""});
-      const [check,setCheck]=React.useState({date:today(),inspector:"Bjørn Petersson",result:"OK",notes:""}); // <-- default kontrollør + OK
-      const [items,setItems]=React.useState([]);
-      const [photo,setPhoto]=React.useState(null);
-
-      const address=c=>[c.street,[c.zip,c.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
-
-      // Hvis vi er på newCheck uten items, bygg nå
-      React.useEffect(()=>{
-        if (view==="newCheck" && currentIndividual && (!items || items.length===0)) {
-          const base=(CHECKLISTS[currentIndividual.type]||[]).map((label,i)=>({key:"k"+i,label,status:"OK",notes:""}));
-          setItems(base);
-        }
-      }, [view, currentIndividual]);
-
-      // backup/import
-      const exportBackup=()=>{
-        const blob=new Blob([JSON.stringify(db,null,2)],{type:"application/json"});
-        const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`aarskontroll-backup_${today()}.json`; a.click(); URL.revokeObjectURL(a.href);
-      };
-      const importBackup=async(file)=>{
-        try{const data=JSON.parse(await file.text()); setDb({customers:[],individuals:[],checks:[],items:[],...data}); alert("Backup importert!");}
-        catch(e){alert("Kunne ikke importere: "+e.message);}
-      };
-
-      // kunder
-      const addCustomer=()=>{
-        if(!cust.name.trim()) return alert("Kundenavn må fylles ut");
-        const c={id:uid(),...cust};
-        setDb(s=>({...s,customers:[...s.customers,c]}));
-        setCust({name:"",contact:"",phone:"",email:"",orgnr:"",street:"",zip:"",city:""});
-      };
-      const updateCustomer=c=>setDb(s=>({...s,customers:s.customers.map(x=>x.id===c.id?c:x)}));
-      const deleteCustomer=id=>{
-        if(!confirm("Slette kunde og alt knyttet?")) return;
-        setDb(s=>{
-          const inds=s.individuals.filter(i=>i.customerId===id).map(i=>i.id);
-          return {
-            customers:s.customers.filter(c=>c.id!==id),
-            individuals:s.individuals.filter(i=>i.customerId!==id),
-            checks:s.checks.filter(y=>!inds.includes(y.individualId)),
-            items:s.items.filter(it=>!s.checks.some(y=>inds.includes(y.individualId)&&it.yearcheckId===y.id))
-          };
-        });
-        setCurrentCustomer(null); setView("customers");
-      };
-
-      // individer
-      const addIndividual=()=>{
-        if(!currentCustomer) return alert("Velg kunde");
-        if(!ind.name.trim()) return alert("Navn må fylles ut");
-        if(!ind.type) return alert("Velg type");
-        const d={id:uid(),customerId:currentCustomer.id,...ind};
-        setDb(s=>({...s,individuals:[...s.individuals,d]}));
-        setInd({name:"",type:"",serial:"",notes:""});
-      };
-      const updateIndividual=d=>setDb(s=>({...s,individuals:s.individuals.map(x=>x.id===d.id?d:x)}));
-      const deleteIndividual=id=>{
-        if(!confirm("Slette individ og tilhørende rapporter?")) return;
-        setDb(s=>{
-          const checks=s.checks.filter(y=>y.individualId===id).map(y=>y.id);
-          return {...s,
-            individuals:s.individuals.filter(i=>i.id!==id),
-            checks:s.checks.filter(y=>y.individualId!==id),
-            items:s.items.filter(it=>!checks.includes(it.yearcheckId))
-          };
-        });
-        if(currentIndividual && currentIndividual.id===id){ setCurrentIndividual(null); setView("customerDetail"); }
-      };
-
-      // rapporter
-      const startChecklist=(individual)=>{
-        setCurrentIndividual(individual);
-        const base=(CHECKLISTS[individual.type]||[]).map((label,i)=>({key:"k"+i,label,status:"OK",notes:""}));
-        setItems(base); setPhoto(null);
-        setCheck({date:today(),inspector:"Bjørn Petersson",result:"OK",notes:""}); // default her også
-        setView("newCheck");
-      };
-      const saveCheck=()=>{
-        const y={id:uid(),individualId:currentIndividual.id,photo:photo||null,...check,
-          nextDate:new Date(new Date(check.date).setFullYear(new Date(check.date).getFullYear()+1)).toISOString().slice(0,10)};
-        const its=items.map(i=>({id:uid(),yearcheckId:y.id,...i}));
-        setDb(s=>({...s,checks:[y,...s.checks],items:[...s.items,...its]}));
-        setView("customerDetail");
-      };
-      const deleteCheck=id=>{
-        if(!confirm("Slette denne rapporten?")) return;
-        setDb(s=>({...s,checks:s.checks.filter(y=>y.id!==id),items:s.items.filter(i=>i.yearcheckId!==id)}));
-      };
-
-      // pdf
-      const exportPdf=y=>{
-        if(!jsPDF){ alert("jsPDF ikke lastet (CDN). Prøv å laste siden på nytt."); return; }
-        const doc=new jsPDF({unit:"pt",format:"a4"});
-        const margin=40,pageW=doc.internal.pageSize.getWidth(),pageH=doc.internal.pageSize.getHeight();
-        const centerX=pageW/2, centerY=pageH/2;
-        let yPos=margin;
-        const indiv=db.individuals.find(i=>i.id===y.individualId)||{};
-        const cust=db.customers.find(c=>c.id===indiv.customerId)||{};
-
-        // VANNMERKE dersom underkjent
-        if ((y.result||"").toLowerCase()==="underkjent") {
-          doc.saveGraphicsState && doc.saveGraphicsState();
-          doc.setTextColor(220,0,0);
-          doc.setFontSize(80);
-          doc.text("UNDERKJENT", centerX, centerY, {angle:45, align:"center"});
-          doc.setFontSize(12);
-          doc.setTextColor(0,0,0);
-          doc.restoreGraphicsState && doc.restoreGraphicsState();
-        }
-
-        doc.setFontSize(16); doc.text(`${cleanType(indiv.type||"Produkt")} – årskontroll`, margin, yPos); yPos+=26;
-        doc.setFontSize(11);
-        const line=(k,v)=>{doc.text(`${k}: ${v||""}`, margin, yPos); yPos+=16;};
-        line("Kunde", cust.name||"");
-        line("Individ", `${indiv.name||""}${indiv.serial ? " – "+indiv.serial : ""}`);
-        line("Dato", y.date); line("Kontrollør", y.inspector); line("Resultat", y.result);
-        if(y.notes){ doc.text("Notater:", margin, yPos); yPos+=16; doc.text(y.notes, margin, yPos); yPos+=18; }
-
-        if(y.photo){
-          try{
-            const fmt=y.photo.startsWith("data:image/png")?"PNG":"JPEG";
-            const imgW=400,imgH=260;
-            doc.text("Bilde:", margin, yPos); yPos+=10;
-            doc.addImage(y.photo, fmt, margin, yPos, imgW, imgH, undefined, "FAST");
-            yPos+=imgH+10;
-          }catch{}
-        }
-
-        yPos+=6; doc.setFontSize(12); doc.text("Sjekkliste", margin, yPos); yPos+=12;
-        const colW=[(pageW-margin*2)*0.58,(pageW-margin*2)*0.12,(pageW-margin*2)*0.30];
-        doc.setDrawColor(180); doc.setLineWidth(0.8);
-
-        // header
-        doc.setFillColor(90,168,255); doc.setTextColor(255);
-        doc.rect(margin, yPos, colW[0], 24, "FD");
-        doc.rect(margin+colW[0], yPos, colW[1], 24, "FD");
-        doc.rect(margin+colW[0]+colW[1], yPos, colW[2], 24, "FD");
-        doc.text("Punkt", margin+6, yPos+16);
-        doc.text("Status", margin+colW[0]+6, yPos+16);
-        doc.text("Notat", margin+colW[0]+colW[1]+6, yPos+16);
-        doc.setTextColor(0); yPos+=24;
-
-        const rows=db.items.filter(i=>i.yearcheckId===y.id).map(r=>({punkt:r.label,status:r.status,notat:r.notes||""}));
-        rows.forEach(r=>{
-          const isAvvik=String(r.status).toLowerCase()==="anmerking";
-          if(isAvvik) doc.setFillColor(255,235,238);
-          doc.rect(margin, yPos, colW[0], 28, isAvvik?"FD":"S");
-          doc.rect(margin+colW[0], yPos, colW[1], 28, isAvvik?"FD":"S");
-          doc.rect(margin+colW[0]+colW[1], yPos, colW[2], 28, isAvvik?"FD":"S");
-          if(isAvvik) doc.setFillColor(255,255,255);
-          doc.text(r.punkt, margin+6, yPos+18);
-          doc.text(r.status||"", margin+colW[0]+6, yPos+18);
-          doc.text(r.notat||"", margin+colW[0]+colW[1]+6, yPos+18);
-          yPos+=28;
-        });
-
-        // footer (firma)
-        const footerY=pageH-60; doc.setDrawColor(200); doc.line(margin, footerY, pageW-margin, footerY);
-        const f=[
-          "Petersson Industri og Service",
-          "Smed Qvales vei 19b, 8012 Bodø",
-          "Tlf: +47 911 28 084 – E-post: bjorn.petersson@outlook.com",
-          "Org.nr: 933 939 871 MVA"
-        ];
-        let fy=footerY+14; f.forEach(t=>{doc.text(t, margin, fy); fy+=14;});
-        const filename=`aarskontroll_${(cust.name||"kunde").replace(/[^a-z0-9]+/gi,"-").toLowerCase()}_${(indiv.name||"individ").replace(/[^a-z0-9]+/gi,"-").toLowerCase()}_${y.date.replace(/-/g,"")}.pdf`;
-        doc.save(filename);
-      };
-
-      // visning
-      return e(React.Fragment,null,
-        (view==="customers")      && e(CustomersView,{db,cust,setCust,setView,setCurrentCustomer,exportBackup,importBackup,addCustomer,address,updateCustomer,deleteCustomer}),
-        (view==="customerDetail") && currentCustomer && e(CustomerDetailView,{db,currentCustomer,setView,ind,setInd,addIndividual,cleanType,setCurrentIndividual,updateIndividual,deleteIndividual,address,exportPdf,deleteCheck, startChecklist}),
-        (view==="reports")        && currentIndividual && e(ReportsView,{db,currentIndividual,setView,exportPdf,deleteCheck}),
-        (view==="newCheck")       && currentIndividual && e(NewCheckView,{db,currentIndividual,setView,check,setCheck,items,setItems,photo,setPhoto,readFileAsDataURL,saveCheck})
-      );
-    }
-
-    ReactDOM.createRoot(document.getElementById("root")).render(e(App));
-  })();
-  </script>
-</body>
-</html>
+        </script>
+```0
