@@ -336,31 +336,22 @@ h1{font-size:22px;margin:0;font-weight:800}
       yPos+=rowH;
     });
 
-// --- VANNMERKE: kun i tomrommet mellom tabell og footer (horisontalt)
-const footerTop = pageH - 60;
-const gapTop = yPos + 12;           // litt luft under tabellen
-const gapBottom = footerTop - 12;   // litt luft over footer
-const gapHeight = gapBottom - gapTop;
+// --- VANNMERKE: fast størrelse 40 px, horisontalt i gapet
+const footerTop  = pageH - 60;
+const gapTop     = yPos + 12;          // litt luft under tabellen
+const gapBottom  = footerTop - 12;     // litt luft over footer
+const gapHeight  = gapBottom - gapTop;
 
-if ((y.result || "").toLowerCase() === "underkjent" && gapHeight > 60) {
+if ((y.result || "").toLowerCase() === "underkjent" && gapHeight > 50) {
   const text = "UNDERKJENT";
-
-  // Finn maksimal fontstørrelse som passer både i høyden og bredden av gapet
-  let fontSize = Math.min(72, Math.floor(gapHeight * 0.45)); // hold god margin i høyden
+  const fontSize = 40;                 // fast størrelse
   doc.setFontSize(fontSize);
-  const maxWidth = pageW - margin * 2;
 
-  while (doc.getTextWidth(text) > maxWidth && fontSize > 20) {
-    fontSize -= 2;
-    doc.setFontSize(fontSize);
-  }
-
-  // Tegn vannmerket midt i gapet (uten rotasjon) med svak opacity
+  // Tegn vannmerket midt i gapet (ingen rotasjon), svak opacity
   const centerY = gapTop + gapHeight / 2;
   if (doc.GState && doc.setGState) doc.setGState(doc.GState({ opacity: 0.14 }));
   doc.setTextColor(200, 0, 0);
   doc.text(text, pageW / 2, centerY, { align: "center" });
-  // Tilbakestill grafikktilstand
   if (doc.GState && doc.setGState) doc.setGState(doc.GState({ opacity: 1 }));
   doc.setTextColor(0, 0, 0);
 }
