@@ -45,10 +45,10 @@
   (function(){
     const React = window.React, ReactDOM = window.ReactDOM;
     const { jsPDF } = (window.jspdf||{});
-    const e = React.createElement;
+    const e = React.createElement, F = React.Fragment;
 
     // ===== Helpers & data =====
-    const LS="aarskontroll_store_v23";
+    const LS="aarskontroll_store_v24";
     const load=()=>{try{return JSON.parse(localStorage.getItem(LS)||"{}")}catch{return{}}};
     const debouncedSave=(()=>{let t=null;return s=>{clearTimeout(t);t=setTimeout(()=>localStorage.setItem(LS,JSON.stringify(s)),300)}})();
     const uid=()=>Math.random().toString(36).slice(2)+Date.now().toString(36);
@@ -99,9 +99,28 @@
         "Kroker/karabiner intakte og funksjonelle","Lengde samsvarer med spesifikasjon","Kontrolldato oppdatert"
       ]
     };
-    const PRODUCT_TYPES=Object.keys(CHECKLISTS);
 
-    // ===== UI atoms (oppdatert Select som tar children) =====
+    // Primær liste
+    let PRODUCT_TYPES = Object.keys(CHECKLISTS);
+
+    // Fallback hvis noe gikk galt
+    if (!PRODUCT_TYPES || !PRODUCT_TYPES.length) {
+      PRODUCT_TYPES = [
+        "EN361 / EN358 / EN813 – Sele",
+        "EN355 – Fangline / Falldemper",
+        "EN360 – Fallblokk",
+        "EN353-2 – Linesystem / Vertikal line",
+        "EN358 – Støttesystem",
+        "EN354 – Forbindelsesline",
+        "EN795 – Forankringsanordning",
+        "EN362 – Koblingsstykke / Karabiner",
+        "EN341 – Nedfirings- / Redningsutstyr"
+      ];
+    }
+    // (valgfritt) kort konsolltest
+    try{ console.log("PRODUCT_TYPES:", PRODUCT_TYPES.length, PRODUCT_TYPES[0]); }catch{}
+
+    // ===== UI atoms =====
     const Button   = (p)=>React.createElement("button",{className:"btn",...p}, p.children);
     const BtnSec   = (p)=>React.createElement("button",{className:"btn secondary",...p}, p.children);
     const BtnDanger= (p)=>React.createElement("button",{className:"btn danger",...p}, p.children);
@@ -114,9 +133,10 @@
     const L       = (t)=>React.createElement("div",{className:"label"}, t);
     const Input   = (p)=>React.createElement("input",{className:"input",...p});
     const TextArea= (p)=>React.createElement("textarea",{className:"input",...p});
+    // Viktig: viderefør children
     const Select  = ({children, ...p})=>React.createElement("select",{className:"input",...p}, children);
 
-    // ===== Views (TOP-LEVEL, STABLE) =====
+    // ===== View-komponenter =====
     function CustomersView({db,cust,setCust,setView,setCurrentCustomer,exportBackup,importBackup,addCustomer,address,updateCustomer,deleteCustomer}) {
       return e("div",{className:"grid two"},
         e(Card,{title:"Kunder"},
@@ -167,7 +187,7 @@
             e("div",null,L("Postnr"),Input({value:cust.zip,onChange:ev=>setCust({...cust,zip:ev.target.value})})),
             e("div",null,L("Poststed"),Input({value:cust.city,onChange:ev=>setCust({...cust,city:ev.target.value})}))
           ),
-          e("div",{style:{marginTop:10}}, e(Button,{onClick:addCustomer},"Lagre kunde"))
+          e("div",{style:{marginTop:10}}, e("button",{className:"btn",onClick:addCustomer},"Lagre kunde"))
         )
       );
     }
@@ -192,14 +212,15 @@
           e("div",{className:"row two"},
             e("div",null,L("Type produkt"),
               Select({value:ind.type,onChange:ev=>setInd({...ind,type:ev.target.value})},
-                [ e("option",{key:"0",value:""},"Velg …"),
+                e(F,null,
+                  e("option",{value:""},"Velg …"),
                   ...PRODUCT_TYPES.map(t=>e("option",{key:t,value:t},t))
-                ]
+                )
               )
             ),
             e("div",null,L("Notater"),TextArea({rows:3,value:ind.notes,onChange:ev=>setInd({...ind,notes:ev.target.value})}))
           ),
-          e("div",{style:{marginTop:10}}, e(Button,{onClick:addIndividual},"Lagre individ"))
+          e("div",{style:{marginTop:10}}, e("button",{className:"btn",onClick:addIndividual},"Lagre individ"))
         ),
         e(Card,{title:"Individer",style:{gridColumn:"1 / -1"}},
           inds.length===0?e("div",{className:"small"},"Ingen individer registrert."):null,
@@ -271,7 +292,7 @@
         e("div",{className:"row two"},
           e("div",null,L("Resultat"),
             Select({value:check.result,onChange:ev=>setCheck({...check,result:ev.target.value})},
-              [ e("option",{key:"ok"},"OK"), e("option",{key:"avvik"},"Avvik") ]
+              e(F,null, e("option",{value:"OK"},"OK"), e("option",{value:"Avvik"},"Avvik"))
             )
           ),
           e("div",null,L("Notater"),TextArea({rows:3,value:check.notes,onChange:ev=>setCheck({...check,notes:ev.target.value})}))
@@ -290,7 +311,11 @@
             Input({style:{marginTop:8},placeholder:"Notat (valgfritt)",value:it.notes,onChange:ev=>setItems(p=>p.map((q,i)=>i===idx?{...q,notes:ev.target.value}:q))})
           ),
           Select({style:{width:120},value:it.status,onChange:ev=>setItems(p=>p.map((q,i)=>i===idx?{...q,status:ev.target.value}:q))},
-            [ e("option",{key:"s-ok"},"OK"), e("option",{key:"s-avvik"},"Avvik"), e("option",{key:"s-na"},"NA") ]
+            e(F,null,
+              e("option",{value:"OK"},"OK"),
+              e("option",{value:"Avvik"},"Avvik"),
+              e("option",{value:"NA"},"NA")
+            )
           )
         )),
         e("div",{style:{display:"flex",gap:8,marginTop:10}},
