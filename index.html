@@ -48,7 +48,7 @@
     const e = React.createElement, F = React.Fragment;
 
     // ===== Helpers & data =====
-    const LS="aarskontroll_store_v25";
+    const LS="aarskontroll_store_v26";
     const load=()=>{try{return JSON.parse(localStorage.getItem(LS)||"{}")}catch{return{}}};
     const debouncedSave=(()=>{let t=null;return s=>{clearTimeout(t);t=setTimeout(()=>localStorage.setItem(LS,JSON.stringify(s)),300)}})();
     const uid=()=>Math.random().toString(36).slice(2)+Date.now().toString(36);
@@ -128,10 +128,9 @@
     const L       = (t)=>React.createElement("div",{className:"label"}, t);
     const Input   = (p)=>React.createElement("input",{className:"input",...p});
     const TextArea= (p)=>React.createElement("textarea",{className:"input",...p});
-    // Select beholdes for andre ting, men IKKE brukt for produkttyper
     const Select  = ({children, ...p})=>React.createElement("select",{className:"input",...p}, children);
 
-    // RÅ sele for produkttyper (ingen wrapper-magi)
+    // RÅ select for produkttyper
     function ProductTypeSelect({ value, onChange }) {
       return React.createElement(
         "select",
@@ -201,7 +200,7 @@
       );
     }
 
-    function CustomerDetailView({db,currentCustomer,setView,ind,setInd,addIndividual,cleanType,setCurrentIndividual,updateIndividual,deleteIndividual,address,exportPdf,deleteCheck}) {
+    function CustomerDetailView({db,currentCustomer,setView,ind,setInd,addIndividual,cleanType,setCurrentIndividual,updateIndividual,deleteIndividual,address,exportPdf,deleteCheck, startChecklist}) {
       const inds=db.individuals.filter(i=>i.customerId===currentCustomer.id);
       const checks=db.checks.filter(y=>inds.some(i=>i.id===y.individualId)).sort((a,b)=>b.date.localeCompare(a.date));
       return e("div",{className:"grid two"},
@@ -220,13 +219,8 @@
           ),
           e("div",{className:"row two"},
             e("div",null,L("Type produkt"),
-              // Bruk rå ProductTypeSelect
-              e(ProductTypeSelect,{
-                value:ind.type,
-                onChange:(ev)=>setInd({...ind,type:ev.target.value})
-              }),
-              e("div",{className:"small",style:{marginTop:6}},
-                `Antall produkttyper: ${PRODUCT_TYPES ? PRODUCT_TYPES.length : 0}`)
+              e(ProductTypeSelect,{value:ind.type,onChange:(ev)=>setInd({...ind,type:ev.target.value})}),
+              e("div",{className:"small",style:{marginTop:6}},`Antall produkttyper: ${PRODUCT_TYPES ? PRODUCT_TYPES.length : 0}`)
             ),
             e("div",null,L("Notater"),TextArea({rows:3,value:ind.notes,onChange:ev=>setInd({...ind,notes:ev.target.value})}))
           ),
@@ -245,7 +239,8 @@
                 ),
                 e("div",{style:{display:"flex",gap:6}},
                   e(BtnSec,{onClick:()=>{setCurrentIndividual(i); setView("reports");}},"Se rapporter"),
-                  e(Button,{onClick:()=>{setCurrentIndividual(i); setView("newCheck");}},"Ny årskontroll"),
+                  // Viktig: kall startChecklist(i) for å bygge sjekklisten
+                  e(Button,{onClick:()=>startChecklist(i)},"Ny årskontroll"),
                   e(BtnSec,{onClick:()=>{const name=prompt("Navn",i.name); if(name===null)return;
                     const type=prompt("Type",i.type); if(type===null)return;
                     const serial=prompt("Serienummer",i.serial||""); if(serial===null)return;
@@ -351,6 +346,14 @@
       const [photo,setPhoto]=React.useState(null);
 
       const address=c=>[c.street,[c.zip,c.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+
+      // SIKKERHETSNETT: hvis vi er på newCheck uten items, bygg dem nå
+      React.useEffect(()=>{
+        if (view==="newCheck" && currentIndividual && (!items || items.length===0)) {
+          const base=(CHECKLISTS[currentIndividual.type]||[]).map((label,i)=>({key:"k"+i,label,status:"OK",notes:""}));
+          setItems(base);
+        }
+      }, [view, currentIndividual]);
 
       // backup/import
       const exportBackup=()=>{
@@ -496,7 +499,7 @@
       // visning
       return e(React.Fragment,null,
         (view==="customers")      && e(CustomersView,{db,cust,setCust,setView,setCurrentCustomer,exportBackup,importBackup,addCustomer,address,updateCustomer,deleteCustomer}),
-        (view==="customerDetail") && currentCustomer && e(CustomerDetailView,{db,currentCustomer,setView,ind,setInd,addIndividual,cleanType,setCurrentIndividual,updateIndividual,deleteIndividual,address,exportPdf,deleteCheck}),
+        (view==="customerDetail") && currentCustomer && e(CustomerDetailView,{db,currentCustomer,setView,ind,setInd,addIndividual,cleanType,setCurrentIndividual,updateIndividual,deleteIndividual,address,exportPdf,deleteCheck, startChecklist}),
         (view==="reports")        && currentIndividual && e(ReportsView,{db,currentIndividual,setView,exportPdf,deleteCheck}),
         (view==="newCheck")       && currentIndividual && e(NewCheckView,{db,currentIndividual,setView,check,setCheck,items,setItems,photo,setPhoto,readFileAsDataURL,saveCheck})
       );
