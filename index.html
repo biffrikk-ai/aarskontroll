@@ -48,7 +48,7 @@
     const e = React.createElement, F = React.Fragment;
 
     // ===== Helpers & data =====
-    const LS="aarskontroll_store_v24";
+    const LS="aarskontroll_store_v25";
     const load=()=>{try{return JSON.parse(localStorage.getItem(LS)||"{}")}catch{return{}}};
     const debouncedSave=(()=>{let t=null;return s=>{clearTimeout(t);t=setTimeout(()=>localStorage.setItem(LS,JSON.stringify(s)),300)}})();
     const uid=()=>Math.random().toString(36).slice(2)+Date.now().toString(36);
@@ -99,11 +99,7 @@
         "Kroker/karabiner intakte og funksjonelle","Lengde samsvarer med spesifikasjon","Kontrolldato oppdatert"
       ]
     };
-
-    // Primær liste
     let PRODUCT_TYPES = Object.keys(CHECKLISTS);
-
-    // Fallback hvis noe gikk galt
     if (!PRODUCT_TYPES || !PRODUCT_TYPES.length) {
       PRODUCT_TYPES = [
         "EN361 / EN358 / EN813 – Sele",
@@ -117,7 +113,6 @@
         "EN341 – Nedfirings- / Redningsutstyr"
       ];
     }
-    // (valgfritt) kort konsolltest
     try{ console.log("PRODUCT_TYPES:", PRODUCT_TYPES.length, PRODUCT_TYPES[0]); }catch{}
 
     // ===== UI atoms =====
@@ -133,10 +128,24 @@
     const L       = (t)=>React.createElement("div",{className:"label"}, t);
     const Input   = (p)=>React.createElement("input",{className:"input",...p});
     const TextArea= (p)=>React.createElement("textarea",{className:"input",...p});
-    // Viktig: viderefør children
+    // Select beholdes for andre ting, men IKKE brukt for produkttyper
     const Select  = ({children, ...p})=>React.createElement("select",{className:"input",...p}, children);
 
-    // ===== View-komponenter =====
+    // RÅ sele for produkttyper (ingen wrapper-magi)
+    function ProductTypeSelect({ value, onChange }) {
+      return React.createElement(
+        "select",
+        { className: "input", value, onChange },
+        [
+          React.createElement("option", { key: "0", value: "" }, "Velg …"),
+          ...PRODUCT_TYPES.map((t) =>
+            React.createElement("option", { key: t, value: t }, t)
+          ),
+        ]
+      );
+    }
+
+    // ===== Views =====
     function CustomersView({db,cust,setCust,setView,setCurrentCustomer,exportBackup,importBackup,addCustomer,address,updateCustomer,deleteCustomer}) {
       return e("div",{className:"grid two"},
         e(Card,{title:"Kunder"},
@@ -211,12 +220,13 @@
           ),
           e("div",{className:"row two"},
             e("div",null,L("Type produkt"),
-              Select({value:ind.type,onChange:ev=>setInd({...ind,type:ev.target.value})},
-                e(F,null,
-                  e("option",{value:""},"Velg …"),
-                  ...PRODUCT_TYPES.map(t=>e("option",{key:t,value:t},t))
-                )
-              )
+              // Bruk rå ProductTypeSelect
+              e(ProductTypeSelect,{
+                value:ind.type,
+                onChange:(ev)=>setInd({...ind,type:ev.target.value})
+              }),
+              e("div",{className:"small",style:{marginTop:6}},
+                `Antall produkttyper: ${PRODUCT_TYPES ? PRODUCT_TYPES.length : 0}`)
             ),
             e("div",null,L("Notater"),TextArea({rows:3,value:ind.notes,onChange:ev=>setInd({...ind,notes:ev.target.value})}))
           ),
@@ -301,7 +311,7 @@
         e("div",{style:{fontWeight:700,marginBottom:6}},"Vedlegg (valgfritt)"),
         e("div",{style:{display:"flex",alignItems:"center",gap:10,marginBottom:10}},
           e("input",{type:"file",accept:"image/*",onChange:async ev=>{const f=ev.target.files&&ev.target.files[0]; if(!f)return; const data=await readFileAsDataURL(f); setPhoto(data);}}),
-          photo?e("img",{src:photo,className:"thumb",alt:"Vedlegg"}):null
+          photo?e("img",{src:photo,className:"thumb",alt:"Vedlagt bilde"}):null
         ),
         e("div",{className:"divider"}),
         e("div",{style:{fontWeight:700,marginBottom:6}},"Sjekkliste"),
@@ -325,7 +335,7 @@
       );
     }
 
-    // ===== App (state + handlers) =====
+    // ===== App =====
     function App(){
       const [db,setDb]=React.useState(()=>({customers:[],individuals:[],checks:[],items:[],...load()}));
       React.useEffect(()=>debouncedSave(db),[db]);
