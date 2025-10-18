@@ -56,27 +56,20 @@
     const cleanType=(t="")=>String(t).replace(/EN\s*\d+(\s*\/\s*EN\d+)*/gi,"").replace(/[–-]\s*/g,"").trim();
     const readFileAsDataURL=f=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)});
 
-    const CHECKLISTS={ /* samme som før, forkortet for plass */
+    const CHECKLISTS={
       "EN361 / EN358 / EN813 – Sele":[
-        "Merkelapp/ID lesbar og samsvarer med standard",
-        "Bånd/stropper uten kutt, rifter, oppflising eller misfarging",
-        "Sømmer intakte – ingen løse tråder",
-        "D-ringer/spenner uten rust/deformasjon/skarpe kanter",
-        "Justeringspunkter fungerer og holder posisjon",
-        "Polstring/festepunkter i god stand",
-        "Produsentens etikett/sertifisering lesbar",
-        "Utstyr rent/tørt/korrekt lagret",
-        "Ingen tegn til overbelastning/fall/modifikasjon"
+        "Merkelapp/ID lesbar og samsvarer med standard","Bånd/stropper uten kutt, rifter, oppflising eller misfarging",
+        "Sømmer intakte – ingen løse tråder","D-ringer/spenner uten rust/deformasjon/skarpe kanter",
+        "Justeringspunkter fungerer og holder posisjon","Polstring/festepunkter i god stand",
+        "Produsentens etikett/sertifisering lesbar","Utstyr rent/tørt/korrekt lagret","Ingen tegn til overbelastning/fall/modifikasjon"
       ],
       "EN355 – Fangline / Falldemper":[
         "Merkelapp/ID lesbar – EN355","Falldemper ikke utløst/forlenget","Line uten kutt/slitasje/UV/kjemisk skade",
-        "Sømmer/termineringer hele","Kroker/karabiner lukker og ikke deformert","Visuell fallindikator ikke aktivert",
-        "Lengde og type passer bruksområdet"
+        "Sømmer/termineringer hele","Kroker/karabiner lukker og ikke deformert","Visuell fallindikator ikke aktivert","Lengde og type passer bruksområdet"
       ],
       "EN360 – Fallblokk":[
         "Merkelapp lesbar – EN360","Hus uten sprekker/deformasjon/skade","Wire/bånd uten rust/oppflising/kutt/bøying",
-        "Innspoling jevn uten rykk","Brems løser normalt ved trekkprøve","Krok med sikkerhetslås ok",
-        "Fallindikator viser ikke utløsning","Siste kontrollmerke oppdatert"
+        "Innspoling jevn uten rykk","Brems løser normalt ved trekkprøve","Krok med sikkerhetslås ok","Fallindikator viser ikke utløsning","Siste kontrollmerke oppdatert"
       ],
       "EN353-2 – Linesystem / Vertikal line":[
         "Merkelapp og produsentinfo lesbar – EN353-2","Wire/tau uten kutt/slitasje/oppflising/rust",
@@ -89,13 +82,12 @@
         "Sømmer/termineringer uten skade","Bruksområde/merking samsvarer med bruk"
       ],
       "EN354 – Forbindelsesline":[
-        "Merkelapp lesbar – EN354","Tau uten kutt/rifter/UV/kjemisk skade",
-        "Endefester/sømmer intakte","Kroker fungerer og lukker korrekt","Lengde/type samsvarer med bruk"
+        "Merkelapp lesbar – EN354","Tau uten kutt/rifter/UV/kjemisk skade","Endefester/sømmer intakte",
+        "Kroker fungerer og lukker korrekt","Lengde/type samsvarer med bruk"
       ],
       "EN795 – Forankringsanordning":[
         "Merkelapp og produsentinfo lesbar – EN795","Forankringspunkt fast – uten sprekker/rust/deformasjon",
-        "Bolter/fester stramme uten korrosjon","Bevegelige deler fungerer fritt",
-        "Plassering korrekt i forhold til arbeid","Kapasitet/WLL iht. dokumentasjon"
+        "Bolter/fester stramme uten korrosjon","Bevegelige deler fungerer fritt","Plassering korrekt i forhold til arbeid","Kapasitet/WLL iht. dokumentasjon"
       ],
       "EN362 – Koblingsstykke / Karabiner":[
         "Merkelapp/merking lesbar – EN362","Låsemekanisme fungerer – åpner/lukker korrekt",
@@ -109,15 +101,20 @@
     };
     const PRODUCT_TYPES=Object.keys(CHECKLISTS);
 
-    // ===== UI atoms =====
-    const Button = p=>e("button",{className:"btn",...p},p.children);
-    const BtnSec = p=>e("button",{className:"btn secondary",...p},p.children);
-    const BtnDanger = p=>e("button",{className:"btn danger",...p},p.children);
-    const Card = ({title,children,actions,style})=>e("div",{className:"card",style}, title?e("h3",null,title):null, children, actions?e("div",{style:{marginTop:8,display:"flex",gap:8,flexWrap:"wrap"}},actions):null);
-    const L = t=>e("div",{className:"label"},t);
-    const Input = p=>e("input",{className:"input",...p});
-    const TextArea = p=>e("textarea",{className:"input",...p});
-    const Select = p=>e("select",{className:"input",...p});
+    // ===== UI atoms (oppdatert Select som tar children) =====
+    const Button   = (p)=>React.createElement("button",{className:"btn",...p}, p.children);
+    const BtnSec   = (p)=>React.createElement("button",{className:"btn secondary",...p}, p.children);
+    const BtnDanger= (p)=>React.createElement("button",{className:"btn danger",...p}, p.children);
+    const Card = ({title,children,actions,style}) =>
+      React.createElement("div",{className:"card",style},
+        title ? React.createElement("h3",null,title) : null,
+        children,
+        actions ? React.createElement("div",{style:{marginTop:8,display:"flex",gap:8,flexWrap:"wrap"}}, actions) : null
+      );
+    const L       = (t)=>React.createElement("div",{className:"label"}, t);
+    const Input   = (p)=>React.createElement("input",{className:"input",...p});
+    const TextArea= (p)=>React.createElement("textarea",{className:"input",...p});
+    const Select  = ({children, ...p})=>React.createElement("select",{className:"input",...p}, children);
 
     // ===== Views (TOP-LEVEL, STABLE) =====
     function CustomersView({db,cust,setCust,setView,setCurrentCustomer,exportBackup,importBackup,addCustomer,address,updateCustomer,deleteCustomer}) {
@@ -303,7 +300,7 @@
       );
     }
 
-    // ===== App (bare state + handlers) =====
+    // ===== App (state + handlers) =====
     function App(){
       const [db,setDb]=React.useState(()=>({customers:[],individuals:[],checks:[],items:[],...load()}));
       React.useEffect(()=>debouncedSave(db),[db]);
@@ -461,12 +458,12 @@
         doc.save(filename);
       };
 
-      // render valgt view
+      // visning
       return e(React.Fragment,null,
-        view==="customers" && e(CustomersView,{db,cust,setCust,setView,setCurrentCustomer,exportBackup,importBackup,addCustomer,address,updateCustomer,deleteCustomer}),
-        view==="customerDetail" && currentCustomer && e(CustomerDetailView,{db,currentCustomer,setView,ind,setInd,addIndividual,cleanType,setCurrentIndividual,updateIndividual,deleteIndividual,address,exportPdf,deleteCheck}),
-        view==="reports" && currentIndividual && e(ReportsView,{db,currentIndividual,setView,exportPdf,deleteCheck}),
-        view==="newCheck" && currentIndividual && e(NewCheckView,{db,currentIndividual,setView,check,setCheck,items,setItems,photo,setPhoto,readFileAsDataURL,saveCheck})
+        (view==="customers")      && e(CustomersView,{db,cust,setCust,setView,setCurrentCustomer,exportBackup,importBackup,addCustomer,address,updateCustomer,deleteCustomer}),
+        (view==="customerDetail") && currentCustomer && e(CustomerDetailView,{db,currentCustomer,setView,ind,setInd,addIndividual,cleanType,setCurrentIndividual,updateIndividual,deleteIndividual,address,exportPdf,deleteCheck}),
+        (view==="reports")        && currentIndividual && e(ReportsView,{db,currentIndividual,setView,exportPdf,deleteCheck}),
+        (view==="newCheck")       && currentIndividual && e(NewCheckView,{db,currentIndividual,setView,check,setCheck,items,setItems,photo,setPhoto,readFileAsDataURL,saveCheck})
       );
     }
 
