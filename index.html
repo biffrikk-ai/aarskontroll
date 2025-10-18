@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Årskontroll – Web</title>
 <style>
-:root{--bg:#f6f9ff;--card:#ffffff;--text:#0f172a;--muted:#64748b;--primary:#5aa8ff;--stroke:#e2e8f0;}
+:root{--bg:#f6f9ff;--card:#fff;--text:#0f172a;--muted:#64748b;--primary:#5aa8ff;--stroke:#e2e8f0}
 *{box-sizing:border-box} html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif}
 .container{max-width:1100px;margin:0 auto;padding:20px}
-.appbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;background:linear-gradient(180deg,#eaf3ff,#ffffff);border:1px solid var(--stroke);border-radius:18px;padding:14px 16px;box-shadow:0 4px 16px rgba(16,24,40,.06)}
+.appbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;background:linear-gradient(180deg,#eaf3ff,#fff);border:1px solid var(--stroke);border-radius:18px;padding:14px 16px;box-shadow:0 4px 16px rgba(16,24,40,.06)}
 h1{font-size:22px;margin:0;font-weight:800}
 .btn{background:var(--primary);color:#fff;border:none;border-radius:12px;padding:10px 14px;font-weight:700;box-shadow:0 2px 8px rgba(63,144,242,.25);cursor:pointer}
 .btn.secondary{background:#fff;color:#0f172a;border:1px solid var(--stroke)}
@@ -20,13 +20,13 @@ h1{font-size:22px;margin:0;font-weight:800}
 .label{font-size:12px;color:var(--muted);margin-bottom:6px}
 .input,select,textarea{width:100%;border:1px solid var(--stroke);border-radius:12px;padding:10px 12px;font-size:14px;background:#fff}
 .row{display:grid;gap:12px}
-@media(min-width:720px){.row.two{grid-template-columns:1fr 1fr} .row.three{grid-template-columns:1fr 1fr 1fr}}
+@media(min-width:720px){.row.two{grid-template-columns:1fr 1fr}.row.three{grid-template-columns:1fr 1fr 1fr}}
 .kundeitem{display:flex;justify-content:space-between;align-items:flex-start;padding:12px;border:1px solid var(--stroke);border-radius:14px;background:#fff}
 .kundeitem:hover{background:#fafcff}
 .small{color:var(--muted);font-size:12px}
 .divider{height:1px;background:var(--stroke);margin:10px 0}
 .thumb{width:140px;height:100px;object-fit:cover;border:1px solid var(--stroke);border-radius:8px}
-/* Avhukingsbokser (radio som ser ut som bokser) */
+/* avhukingsbokser */
 .choices{display:flex;gap:8px;flex-wrap:wrap}
 .choice{position:relative}
 .choice input{position:absolute;opacity:0;pointer-events:none}
@@ -52,8 +52,8 @@ h1{font-size:22px;margin:0;font-weight:800}
   const { jsPDF }=(window.jspdf||{});
   const e=React.createElement, F=React.Fragment;
 
-  /* ==== Helpers & data ==== */
-  const LS="aarskontroll_store_v30";
+  /* ---------- Helpers & data ---------- */
+  const LS="aarskontroll_store_v31";
   const load=()=>{try{return JSON.parse(localStorage.getItem(LS)||"{}")}catch{return{}}};
   const saveDebounced=(()=>{let t=null;return s=>{clearTimeout(t);t=setTimeout(()=>localStorage.setItem(LS,JSON.stringify(s)),300)}})();
   const uid=()=>Math.random().toString(36).slice(2)+Date.now().toString(36);
@@ -106,32 +106,27 @@ h1{font-size:22px;margin:0;font-weight:800}
   };
   const PRODUCT_TYPES=Object.keys(CHECKLISTS);
 
-  /* ==== Små UI-komponenter ==== */
+  /* ---------- UI atoms ---------- */
   const Button=p=>e("button",{className:"btn",...p},p.children);
   const BtnSec=p=>e("button",{className:"btn secondary",...p},p.children);
   const BtnDanger=p=>e("button",{className:"btn danger",...p},p.children);
   const Card=({title,children,actions,style})=>e("div",{className:"card",style},
-    title?e("h3",null,title):null,children,
-    actions?e("div",{style:{marginTop:8,display:"flex",gap:8,flexWrap:"wrap"}},actions):null);
+    title?e("h3",null,title):null,children,actions?e("div",{style:{marginTop:8,display:"flex",gap:8,flexWrap:"wrap"}},actions):null);
   const L=t=>e("div",{className:"label"},t);
   const Input=p=>e("input",{className:"input",...p});
   const TextArea=p=>e("textarea",{className:"input",...p});
-
   const ProductTypeSelect=({value,onChange})=>e("select",{className:"input",value,onChange},
-    e(F,null,e("option",{value:""},"Velg …"),
-      ...PRODUCT_TYPES.map(t=>e("option",{key:t,value:t},t))));
-
+    e(F,null,e("option",{value:""},"Velg …"),...PRODUCT_TYPES.map(t=>e("option",{key:t,value:t},t))));
   const StatusBoxes=({name,value,onChange})=>e("div",{className:"choices"},
     e("div",{className:"choice ok"}, e("input",{id:`${name}-ok`,type:"radio",name,value:"OK",checked:value==="OK",onChange:()=>onChange("OK")}), e("label",{htmlFor:`${name}-ok`},"OK")),
     e("div",{className:"choice warn"}, e("input",{id:`${name}-anm`,type:"radio",name,value:"Anmerking",checked:value==="Anmerking",onChange:()=>onChange("Anmerking")}), e("label",{htmlFor:`${name}-anm`},"Anmerking"))
   );
-
   const ResultBoxes=({value,onChange})=>e("div",{className:"choices"},
     e("div",{className:"choice ok"}, e("input",{id:"res-ok",type:"radio",name:"res",value:"OK",checked:value==="OK",onChange:()=>onChange("OK")}), e("label",{htmlFor:"res-ok"},"OK")),
     e("div",{className:"choice warn"}, e("input",{id:"res-under",type:"radio",name:"res",value:"Underkjent",checked:value==="Underkjent",onChange:()=>onChange("Underkjent")}), e("label",{htmlFor:"res-under"},"Underkjent"))
   );
 
-  /* ==== Views ==== */
+  /* ---------- Views ---------- */
   function CustomersView({db,cust,setCust,setView,setCurrentCustomer,exportBackup,importBackup,addCustomer,address,updateCustomer,deleteCustomer}){
     return e("div",{className:"grid two"},
       e(Card,{title:"Kunder"},
@@ -189,7 +184,7 @@ h1{font-size:22px;margin:0;font-weight:800}
         e("div",{className:"divider"}),
         e(BtnSec,{onClick:()=>setView("customers")},"Tilbake"),
         e("div",{className:"divider"}),
-        e("div",null,e("strong",null,"Samlerapport (PDF)")),
+        e("div",null,e("strong",null,"Samlerapport (PDF) – landskap")),
         e("div",{className:"row two",style:{marginTop:8}},
           e("div",null,L("Fra dato"),Input({type:"date",value:bundleFrom,onChange:ev=>setBundleFrom(ev.target.value)})),
           e("div",null,L("Til dato"),Input({type:"date",value:bundleTo,onChange:ev=>setBundleTo(ev.target.value)}))),
@@ -285,7 +280,84 @@ h1{font-size:22px;margin:0;font-weight:800}
     );
   }
 
-  /* ==== App + PDF ==== */
+  /* ---------- PDF helpers ---------- */
+  function renderSingleReport(doc,y,dbRef){ // portrait A4
+    const margin=40, pageW=doc.internal.pageSize.getWidth(), pageH=doc.internal.pageSize.getHeight();
+    let yPos=margin;
+
+    const indiv=dbRef.individuals.find(i=>i.id===y.individualId)||{};
+    const cust =dbRef.customers.find(c=>c.id===indiv.customerId)||{};
+
+    doc.setFontSize(16); doc.setTextColor(0,0,0);
+    doc.text(`${cleanType(indiv.type||"Produkt")} – årskontroll`,margin,yPos); yPos+=26;
+
+    doc.setFontSize(11);
+    const line=(k,v)=>{doc.text(`${k}: ${v||""}`,margin,yPos); yPos+=16;};
+    line("Kunde",cust.name||"");
+    line("Individ",`${indiv.name||""}${indiv.serial?" – "+indiv.serial:""}`);
+    line("Dato",y.date); line("Kontrollør",y.inspector); line("Resultat",y.result);
+    if(y.notes){doc.text("Notater:",margin,yPos); yPos+=16; doc.text(y.notes,margin,yPos); yPos+=18;}
+
+    if(y.photo){try{
+      const fmt=y.photo.startsWith("data:image/png")?"PNG":"JPEG";
+      const imgW=400,imgH=260;
+      doc.text("Bilde:",margin,yPos); yPos+=10;
+      doc.addImage(y.photo,fmt,margin,yPos,imgW,imgH,undefined,"FAST");
+      yPos+=imgH+10;
+    }catch{}}
+
+    yPos+=6; doc.setFontSize(12); doc.text("Sjekkliste",margin,yPos); yPos+=12;
+    const tableW=pageW-margin*2;
+    const colW=[tableW*0.58,tableW*0.12,tableW*0.30];
+    doc.setDrawColor(180); doc.setLineWidth(0.8);
+
+    // header
+    doc.setFillColor(90,168,255); doc.setTextColor(255);
+    doc.rect(margin,yPos,colW[0],24,"FD");
+    doc.rect(margin+colW[0],yPos,colW[1],24,"FD");
+    doc.rect(margin+colW[0]+colW[1],yPos,colW[2],24,"FD");
+    doc.text("Punkt",margin+6,yPos+16);
+    doc.text("Status",margin+colW[0]+6,yPos+16);
+    doc.text("Notat",margin+colW[0]+colW[1]+6,yPos+16);
+    doc.setTextColor(0,0,0); yPos+=24;
+
+    const rows=dbRef.items.filter(i=>i.yearcheckId===y.id).map(r=>({punkt:r.label,status:r.status,notat:r.notes||""}));
+    const rowH=28;
+    rows.forEach(r=>{
+      const isAnm=String(r.status).toLowerCase()==="anmerking";
+      if(isAnm) doc.setFillColor(255,235,238);
+      doc.rect(margin,yPos,colW[0],rowH,isAnm?"FD":"S");
+      doc.rect(margin+colW[0],yPos,colW[1],rowH,isAnm?"FD":"S");
+      doc.rect(margin+colW[0]+colW[1],yPos,colW[2],rowH,isAnm?"FD":"S");
+      if(isAnm) doc.setFillColor(255,255,255);
+      doc.text(r.punkt,margin+6,yPos+18);
+      doc.text(r.status||"",margin+colW[0]+6,yPos+18);
+      doc.text(r.notat||"",margin+colW[0]+colW[1]+6,yPos+18);
+      yPos+=rowH;
+    });
+
+    // vannmerke mellom tabellslutt og footer
+    const footerTop=pageH-60;
+    if((y.result||"").toLowerCase()==="underkjent" && yPos+20<footerTop){
+      let sz=58, txt="UNDERKJENT";
+      doc.setFontSize(sz);
+      while(doc.getTextWidth(txt)>(pageW-80) && sz>28){ sz-=2; doc.setFontSize(sz); }
+      if(doc.GState && doc.setGState) doc.setGState(doc.GState({opacity:0.14}));
+      doc.setTextColor(200,0,0);
+      doc.text(txt,pageW/2,(yPos+footerTop)/2,{angle:45,align:"center"});
+      if(doc.GState && doc.setGState) doc.setGState(doc.GState({opacity:1}));
+      doc.setTextColor(0,0,0);
+    }
+
+    // footer
+    doc.setFontSize(10);
+    const yFooter=pageH-60;
+    doc.setDrawColor(200); doc.line(margin,yFooter,pageW-margin,yFooter);
+    const foot=["Petersson Industri og Service","Smed Qvales vei 19b, 8012 Bodø","Tlf: +47 911 28 084 – E-post: bjorn.petersson@outlook.com","Org.nr: 933 939 871 MVA"];
+    let fy=yFooter+14; foot.forEach(t=>{doc.text(t,margin,fy); fy+=12;});
+  }
+
+  /* ---------- App + PDF ---------- */
   function App(){
     const [db,setDb]=React.useState(()=>({customers:[],individuals:[],checks:[],items:[],...load()}));
     React.useEffect(()=>saveDebounced(db),[db]);
@@ -354,68 +426,9 @@ h1{font-size:22px;margin:0;font-weight:800}
     const deleteCheck=id=>{if(!confirm("Slette denne rapporten?"))return;
       setDb(s=>({...s,checks:s.checks.filter(y=>y.id!==id),items:s.items.filter(i=>i.yearcheckId!==id)}));};
 
-    function renderSingleReport(doc,y,dbRef){
-      const margin=40,pageW=doc.internal.pageSize.getWidth(),pageH=doc.internal.pageSize.getHeight();
-      let yPos=margin;
-      const indiv=dbRef.individuals.find(i=>i.id===y.individualId)||{};
-      const cust=dbRef.customers.find(c=>c.id===indiv.customerId)||{};
-
-      doc.setFontSize(16);doc.text(`${cleanType(indiv.type||"Produkt")} – årskontroll`,margin,yPos);yPos+=26;
-      doc.setFontSize(11);
-      const line=(k,v)=>{doc.text(`${k}: ${v||""}`,margin,yPos);yPos+=16;};
-      line("Kunde",cust.name||"");
-      line("Individ",`${indiv.name||""}${indiv.serial?" – "+indiv.serial:""}`);
-      line("Dato",y.date);line("Kontrollør",y.inspector);line("Resultat",y.result);
-      if(y.notes){doc.text("Notater:",margin,yPos);yPos+=16;doc.text(y.notes,margin,yPos);yPos+=18;}
-      if(y.photo){try{const fmt=y.photo.startsWith("data:image/png")?"PNG":"JPEG";
-        const imgW=400,imgH=260;doc.text("Bilde:",margin,yPos);yPos+=10;
-        doc.addImage(y.photo,fmt,margin,yPos,imgW,imgH,undefined,"FAST");yPos+=imgH+10;}catch{}}
-
-      yPos+=6;doc.setFontSize(12);doc.text("Sjekkliste",margin,yPos);yPos+=12;
-      const colW=[(pageW-margin*2)*0.58,(pageW-margin*2)*0.12,(pageW-margin*2)*0.30];
-      doc.setDrawColor(180);doc.setLineWidth(0.8);
-      doc.setFillColor(90,168,255);doc.setTextColor(255);
-      doc.rect(margin,yPos,colW[0],24,"FD");
-      doc.rect(margin+colW[0],yPos,colW[1],24,"FD");
-      doc.rect(margin+colW[0]+colW[1],yPos,colW[2],24,"FD");
-      doc.text("Punkt",margin+6,yPos+16);
-      doc.text("Status",margin+colW[0]+6,yPos+16);
-      doc.text("Notat",margin+colW[0]+colW[1]+6,yPos+16);
-      doc.setTextColor(0);yPos+=24;
-
-      const rows=dbRef.items.filter(i=>i.yearcheckId===y.id).map(r=>({punkt:r.label,status:r.status,notat:r.notes||""}));
-      rows.forEach(r=>{
-        const isAnm=String(r.status).toLowerCase()==="anmerking";
-        if(isAnm)doc.setFillColor(255,235,238);
-        doc.rect(margin,yPos,colW[0],28,isAnm?"FD":"S");
-        doc.rect(margin+colW[0],yPos,colW[1],28,isAnm?"FD":"S");
-        doc.rect(margin+colW[0]+colW[1],yPos,colW[2],28,isAnm?"FD":"S");
-        if(isAnm)doc.setFillColor(255,255,255);
-        doc.text(r.punkt,margin+6,yPos+18);
-        doc.text(r.status||"",margin+colW[0]+6,yPos+18);
-        doc.text(r.notat||"",margin+colW[0]+colW[1]+6,yPos+18);
-        yPos+=28;
-      });
-
-      if((y.result||"").toLowerCase()==="underkjent"){
-        const footerY=pageH-60;
-        const centerY=(yPos+footerY)/2, centerX=pageW/2;
-        const gs=doc.GState?doc.GState({opacity:0.14}):null;
-        if(gs&&doc.setGState)doc.setGState(gs);
-        doc.setTextColor(200,0,0);doc.setFontSize(72);
-        doc.text("UNDERKJENT",centerX,centerY,{angle:45,align:"center"});
-        if(gs&&doc.setGState)doc.setGState(doc.GState({opacity:1}));
-        doc.setTextColor(0,0,0);
-      }
-
-      const footerY=pageH-60;doc.setDrawColor(200);doc.line(margin,footerY,pageW-margin,footerY);
-      const f=["Petersson Industri og Service","Smed Qvales vei 19b, 8012 Bodø","Tlf: +47 911 28 084 – E-post: bjorn.petersson@outlook.com","Org.nr: 933 939 871 MVA"];
-      let fy=footerY+14;f.forEach(t=>{doc.text(t,margin,fy);fy+=14;});
-    }
-
+    // ------- PDF: enkeltrapport (portrait) eksport ------
     const exportPdf=y=>{
-      if(!jsPDF)return alert("jsPDF ikke lastet.");
-      const doc=new jsPDF({unit:"pt",format:"a4"});
+      const doc=new jsPDF({unit:"pt",format:"a4",orientation:"portrait"});
       renderSingleReport(doc,y,db);
       const indiv=db.individuals.find(i=>i.id===y.individualId)||{};
       const cust=db.customers.find(c=>c.id===indiv.customerId)||{};
@@ -423,60 +436,75 @@ h1{font-size:22px;margin:0;font-weight:800}
       doc.save(filename);
     };
 
+    // ------- PDF: samlerapport (LANDSKAP), så enkeltrapporter (PORTRAIT) ------
     const exportCustomerBundle=(customer,from,to)=>{
       if(!customer)return alert("Velg kunde");
       if(!from||!to)return alert("Velg Fra og Til dato");
-      const doc=new jsPDF({unit:"pt",format:"a4"});
-      const margin=40,pageW=doc.internal.pageSize.getWidth(),pageH=doc.internal.pageSize.getHeight();
-      let yPos=margin;
 
-      doc.setFontSize(18);doc.text(`Årskontroller – ${customer.name}`,margin,yPos);yPos+=24;
-      doc.setFontSize(11);doc.text(`Periode: ${from} til ${to}`,margin,yPos);yPos+=18;
-      doc.text(`Kontakt: ${customer.contact||"-"} · ${customer.email||"-"} · ${customer.phone||"-"}`,margin,yPos);yPos+=14;
+      // Førstesider i LANDSKAP
+      const doc=new jsPDF({unit:"pt",format:"a4",orientation:"landscape"});
+      const margin=36, pageW=doc.internal.pageSize.getWidth(), pageH=doc.internal.pageSize.getHeight();
+      const tableW=pageW-margin*2;
+
+      // kolonneoppsett – passer i landskap
+      const COLS=[
+        {key:"type",label:"Produkt type",pct:0.34},
+        {key:"name",label:"Navn",pct:0.26},
+        {key:"sn",  label:"Serienummer",pct:0.16},
+        {key:"date",label:"Kontrolldato",pct:0.12},
+        {key:"res", label:"Resultat",pct:0.12}
+      ];
+      const colW=COLS.map(c=>Math.floor(tableW*c.pct));
+      const colX=[margin]; for(let i=1;i<COLS.length;i++) colX[i]=margin+colW.slice(0,i).reduce((a,b)=>a+b,0);
+
+      let y=margin;
+      doc.setFontSize(18); doc.text(`Årskontroller – ${customer.name}`,margin,y); y+=24;
+      doc.setFontSize(11); doc.text(`Periode: ${from} til ${to}`,margin,y); y+=18;
+      doc.text(`Kontakt: ${customer.contact||"-"} · ${customer.email||"-"} · ${customer.phone||"-"}`,margin,y); y+=14;
       const addr=[customer.street,[customer.zip,customer.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
-      doc.text(`Adresse: ${addr}`,margin,yPos);yPos+=20;
+      doc.text(`Adresse: ${addr}`,margin,y); y+=20;
 
-      const colW=[170,170,110,90,90]; // Produkt, Navn, SN, Dato, Resultat
-      doc.setDrawColor(180);doc.setFillColor(90,168,255);doc.setTextColor(255);
-      doc.rect(margin,yPos,colW[0],22,"FD");
-      doc.rect(margin+colW[0],yPos,colW[1],22,"FD");
-      doc.rect(margin+colW[0]+colW[1],yPos,colW[2],22,"FD");
-      doc.rect(margin+colW[0]+colW[1]+colW[2],yPos,colW[3],22,"FD");
-      doc.rect(margin+colW[0]+colW[1]+colW[2]+colW[3],yPos,colW[4],22,"FD");
-      doc.text("Produkt type",margin+6,yPos+15);
-      doc.text("Navn",margin+colW[0]+6,yPos+15);
-      doc.text("Serienummer",margin+colW[0]+colW[1]+6,yPos+15);
-      doc.text("Kontrolldato",margin+colW[0]+colW[1]+colW[2]+6,yPos+15);
-      doc.text("Resultat",margin+colW[0]+colW[1]+colW[2]+colW[3]+6,yPos+15);
-      doc.setTextColor(0);yPos+=22;
+      const drawHeader=()=>{ doc.setDrawColor(180); doc.setFillColor(90,168,255); doc.setTextColor(255);
+        const h=22; COLS.forEach((c,i)=>doc.rect(colX[i],y,colW[i],h,"FD"));
+        doc.setFontSize(11); COLS.forEach((c,i)=>doc.text(c.label,colX[i]+6,y+15));
+        y+=h; doc.setTextColor(0); doc.setFontSize(10);
+      };
+      const newLandscapePage=()=>{ doc.addPage("a4","landscape"); y=margin; drawHeader(); };
+
+      drawHeader();
+
+      const trim=(txt,max)=>{ if(!txt) return ""; const tMax=Math.max(10,max-8); if(doc.getTextWidth(txt)<=tMax) return txt;
+        let s=txt; while(doc.getTextWidth(s+"…")>tMax && s.length>0) s=s.slice(0,-1); return s+"…"; };
 
       const inds=db.individuals.filter(i=>i.customerId===customer.id);
-      const inRange=db.checks.filter(y=>inds.some(i=>i.id===y.individualId))
-        .filter(y=>y.date>=from&&y.date<=to).sort((a,b)=>b.date.localeCompare(a.date));
-      const lastByInd={}; for(const y of inRange){ if(!lastByInd[y.individualId]) lastByInd[y.individualId]=y; }
+      const inRange=db.checks.filter(yc=>inds.some(i=>i.id===yc.individualId))
+        .filter(yc=>yc.date>=from && yc.date<=to).sort((a,b)=>b.date.localeCompare(a.date));
+      const lastByInd={}; for(const yc of inRange) if(!lastByInd[yc.individualId]) lastByInd[yc.individualId]=yc;
 
+      const rowH=22;
       inds.forEach(indiv=>{
-        const y=lastByInd[indiv.id];
-        const row=[cleanType(indiv.type||"")||"",indiv.name||"",indiv.serial||"–",y?y.date:"–",y?y.result:"–"];
-        const isUnder=y && (y.result||"").toLowerCase()==="underkjent";
-        if(isUnder)doc.setFillColor(255,235,238);
-        doc.rect(margin,yPos,colW[0],22,isUnder?"FD":"S");
-        doc.rect(margin+colW[0],yPos,colW[1],22,isUnder?"FD":"S");
-        doc.rect(margin+colW[0]+colW[1],yPos,colW[2],22,isUnder?"FD":"S");
-        doc.rect(margin+colW[0]+colW[1]+colW[2],yPos,colW[3],22,isUnder?"FD":"S");
-        doc.rect(margin+colW[0]+colW[1]+colW[2]+colW[3],yPos,colW[4],22,isUnder?"FD":"S");
-        doc.setTextColor(0,0,0);
-        doc.text(row[0],margin+6,yPos+15);
-        doc.text(row[1],margin+colW[0]+6,yPos+15);
-        doc.text(row[2],margin+colW[0]+colW[1]+6,yPos+15);
-        doc.text(row[3],margin+colW[0]+colW[1]+colW[2]+6,yPos+15);
-        if(isUnder)doc.setTextColor(178,34,34);
-        doc.text(row[4],margin+colW[0]+colW[1]+colW[2]+colW[3]+6,yPos+15);
-        doc.setTextColor(0,0,0);
-        yPos+=22; if(yPos>pageH-100){doc.addPage();yPos=margin;}
+        const yc=lastByInd[indiv.id];
+        if(y>pageH-80) newLandscapePage();
+        const isUnder=yc && (yc.result||"").toLowerCase()==="underkjent";
+        if(isUnder) doc.setFillColor(255,235,238);
+        COLS.forEach((c,i)=>doc.rect(colX[i],y,colW[i],rowH,isUnder?"FD":"S"));
+        const vals={
+          type:trim(cleanType(indiv.type||""),colW[0]),
+          name:trim(indiv.name||"",colW[1]),
+          sn:trim(indiv.serial||"–",colW[2]),
+          date:yc?yc.date:"–",
+          res:yc?yc.result:"–"
+        };
+        COLS.forEach((c,i)=>{ if(c.key==="res"&&isUnder) doc.setTextColor(178,34,34);
+          doc.text(String(vals[c.key]??""),colX[i]+6,y+15);
+          if(c.key==="res"&&isUnder) doc.setTextColor(0,0,0);
+        });
+        y+=rowH;
       });
 
-      inRange.reverse().forEach(y=>{doc.addPage();renderSingleReport(doc,y,db);});
+      // Deretter hver rapport i PORTRETT
+      inRange.reverse().forEach(yc=>{ doc.addPage("a4","portrait"); renderSingleReport(doc,yc,db); });
+
       const fname=`samlerapport_${(customer.name||"kunde").replace(/[^a-z0-9]+/gi,"-").toLowerCase()}_${from.replace(/-/g,"")}-${to.replace(/-/g,"")}.pdf`;
       doc.save(fname);
       return fname;
@@ -492,7 +520,7 @@ h1{font-size:22px;margin:0;font-weight:800}
         `Vedlagt samlerapport for årskontroller i perioden ${from} til ${to} for ${customer.name}.`,
         `Filnavn: ${fname}`,
         ``,
-        `Legg ved PDF-filen manuelt i e-posten (nettlesere støtter ikke automatiske vedlegg via mailto).`,
+        `Legg ved PDF-filen manuelt i e-posten (mailto kan ikke legge ved filer automatisk).`,
         ``,
         `Mvh`,
         `Bjørn Petersson`
@@ -500,6 +528,7 @@ h1{font-size:22px;margin:0;font-weight:800}
       window.location.href=`mailto:${encodeURIComponent(mail)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
     };
 
+    // visning
     return e(F,null,
       (view==="customers")&&e(CustomersView,{db,cust,setCust,setView,setCurrentCustomer,exportBackup,importBackup,addCustomer,address,updateCustomer,deleteCustomer}),
       (view==="customerDetail")&&currentCustomer&&e(CustomerDetailView,{db,currentCustomer,setView,ind,setInd,addIndividual,cleanType,setCurrentCustomer,setCurrentIndividual:update=>update,updateIndividual,deleteIndividual,address,exportPdf,deleteCheck,startChecklist,bundleFrom,bundleTo,setBundleFrom,setBundleTo,exportCustomerBundle,mailCustomerBundle}),
