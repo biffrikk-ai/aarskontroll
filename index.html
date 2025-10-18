@@ -26,6 +26,18 @@
     .small{color:var(--muted);font-size:12px}
     .divider{height:1px;background:var(--stroke);margin:10px 0}
     .thumb{width:140px;height:100px;object-fit:cover;border:1px solid var(--stroke);border-radius:8px}
+
+    /* Avhukingsbokser (radio som ser ut som bokser) */
+    .choices{display:flex;gap:8px;flex-wrap:wrap}
+    .choice{position:relative}
+    .choice input{position:absolute;opacity:0;pointer-events:none}
+    .choice label{
+      display:inline-block; border:1px solid var(--stroke); border-radius:10px; padding:8px 12px; cursor:pointer; user-select:none;
+      background:#fff; min-width:90px; text-align:center; font-weight:600;
+    }
+    .choice input:checked + label{border-color:#5aa8ff; box-shadow:0 0 0 3px rgba(90,168,255,.2)}
+    .choice.ok input:checked + label{background:#eaf6ff}
+    .choice.warn input:checked + label{background:#ffecec; border-color:#ef4444; color:#b91c1c}
   </style>
 </head>
 <body>
@@ -48,7 +60,7 @@
     const e = React.createElement, F = React.Fragment;
 
     // ===== Helpers & data =====
-    const LS="aarskontroll_store_v26";
+    const LS="aarskontroll_store_v27";
     const load=()=>{try{return JSON.parse(localStorage.getItem(LS)||"{}")}catch{return{}}};
     const debouncedSave=(()=>{let t=null;return s=>{clearTimeout(t);t=setTimeout(()=>localStorage.setItem(LS,JSON.stringify(s)),300)}})();
     const uid=()=>Math.random().toString(36).slice(2)+Date.now().toString(36);
@@ -100,20 +112,6 @@
       ]
     };
     let PRODUCT_TYPES = Object.keys(CHECKLISTS);
-    if (!PRODUCT_TYPES || !PRODUCT_TYPES.length) {
-      PRODUCT_TYPES = [
-        "EN361 / EN358 / EN813 – Sele",
-        "EN355 – Fangline / Falldemper",
-        "EN360 – Fallblokk",
-        "EN353-2 – Linesystem / Vertikal line",
-        "EN358 – Støttesystem",
-        "EN354 – Forbindelsesline",
-        "EN795 – Forankringsanordning",
-        "EN362 – Koblingsstykke / Karabiner",
-        "EN341 – Nedfirings- / Redningsutstyr"
-      ];
-    }
-    try{ console.log("PRODUCT_TYPES:", PRODUCT_TYPES.length, PRODUCT_TYPES[0]); }catch{}
 
     // ===== UI atoms =====
     const Button   = (p)=>React.createElement("button",{className:"btn",...p}, p.children);
@@ -141,6 +139,48 @@
             React.createElement("option", { key: t, value: t }, t)
           ),
         ]
+      );
+    }
+
+    // Radio-bokser for OK/Anmerking per punkt
+    function StatusBoxes({ name, value, onChange }) {
+      return React.createElement("div",{className:"choices"},
+        // OK
+        React.createElement("div",{className:"choice ok"},
+          React.createElement("input",{
+            id:`${name}-ok`, type:"radio", name, value:"OK", checked:value==="OK",
+            onChange:()=>onChange("OK")
+          }),
+          React.createElement("label",{htmlFor:`${name}-ok`}, "OK")
+        ),
+        // Anmerking
+        React.createElement("div",{className:"choice warn"},
+          React.createElement("input",{
+            id:`${name}-anm`, type:"radio", name, value:"Anmerking", checked:value==="Anmerking",
+            onChange:()=>onChange("Anmerking")
+          }),
+          React.createElement("label",{htmlFor:`${name}-anm`}, "Anmerking")
+        )
+      );
+    }
+
+    // Radio-bokser for Resultat (OK / Underkjent)
+    function ResultBoxes({ value, onChange }) {
+      return React.createElement("div",{className:"choices"},
+        React.createElement("div",{className:"choice ok"},
+          React.createElement("input",{
+            id:`res-ok`, type:"radio", name:"res", value:"OK", checked:value==="OK",
+            onChange:()=>onChange("OK")
+          }),
+          React.createElement("label",{htmlFor:`res-ok`}, "OK")
+        ),
+        React.createElement("div",{className:"choice warn"},
+          React.createElement("input",{
+            id:`res-ukjent`, type:"radio", name:"res", value:"Underkjent", checked:value==="Underkjent",
+            onChange:()=>onChange("Underkjent")
+          }),
+          React.createElement("label",{htmlFor:`res-ukjent`}, "Underkjent")
+        )
       );
     }
 
@@ -219,8 +259,7 @@
           ),
           e("div",{className:"row two"},
             e("div",null,L("Type produkt"),
-              e(ProductTypeSelect,{value:ind.type,onChange:(ev)=>setInd({...ind,type:ev.target.value})}),
-              e("div",{className:"small",style:{marginTop:6}},`Antall produkttyper: ${PRODUCT_TYPES ? PRODUCT_TYPES.length : 0}`)
+              e(ProductTypeSelect,{value:ind.type,onChange:(ev)=>setInd({...ind,type:ev.target.value})})
             ),
             e("div",null,L("Notater"),TextArea({rows:3,value:ind.notes,onChange:ev=>setInd({...ind,notes:ev.target.value})}))
           ),
@@ -239,7 +278,6 @@
                 ),
                 e("div",{style:{display:"flex",gap:6}},
                   e(BtnSec,{onClick:()=>{setCurrentIndividual(i); setView("reports");}},"Se rapporter"),
-                  // Viktig: kall startChecklist(i) for å bygge sjekklisten
                   e(Button,{onClick:()=>startChecklist(i)},"Ny årskontroll"),
                   e(BtnSec,{onClick:()=>{const name=prompt("Navn",i.name); if(name===null)return;
                     const type=prompt("Type",i.type); if(type===null)return;
@@ -289,19 +327,17 @@
     }
 
     function NewCheckView({db,currentIndividual,setView,check,setCheck,items,setItems,photo,setPhoto,readFileAsDataURL,saveCheck}) {
+      const anmCount = items.reduce((a,b)=>a+(b.status==="Anmerking"?1:0),0);
       return e(Card,{title:`Ny årskontroll – ${currentIndividual?currentIndividual.name:""}`},
         e("div",{className:"row two"},
           e("div",null,L("Dato"),Input({type:"date",value:check.date,onChange:ev=>setCheck({...check,date:ev.target.value})})),
           e("div",null,L("Kontrollør"),Input({value:check.inspector,onChange:ev=>setCheck({...check,inspector:ev.target.value})}))
         ),
         e("div",{className:"row two"},
-          e("div",null,L("Resultat"),
-            Select({value:check.result,onChange:ev=>setCheck({...check,result:ev.target.value})},
-              e(F,null, e("option",{value:"OK"},"OK"), e("option",{value:"Avvik"},"Avvik"))
-            )
-          ),
+          e("div",null,L("Resultat"), e(ResultBoxes,{value:check.result,onChange:(v)=>setCheck({...check,result:v})})),
           e("div",null,L("Notater"),TextArea({rows:3,value:check.notes,onChange:ev=>setCheck({...check,notes:ev.target.value})}))
         ),
+        e("div",{className:"small",style:{marginTop:6}}, `Anmerking: ${anmCount}`),
         e("div",{className:"divider"}),
         e("div",{style:{fontWeight:700,marginBottom:6}},"Vedlegg (valgfritt)"),
         e("div",{style:{display:"flex",alignItems:"center",gap:10,marginBottom:10}},
@@ -310,18 +346,16 @@
         ),
         e("div",{className:"divider"}),
         e("div",{style:{fontWeight:700,marginBottom:6}},"Sjekkliste"),
-        ...items.map((it,idx)=>e("div",{key:it.key,className:"kundeitem",style:{alignItems:"flex-start"}},
+        ...items.map((it,idx)=>e("div",{key:it.key,className:"kundeitem",style:{alignItems:"flex-start",gap:12}},
           e("div",{style:{flex:1}},
             e("div",{className:"small",style:{fontWeight:700}}, it.label),
             Input({style:{marginTop:8},placeholder:"Notat (valgfritt)",value:it.notes,onChange:ev=>setItems(p=>p.map((q,i)=>i===idx?{...q,notes:ev.target.value}:q))})
           ),
-          Select({style:{width:120},value:it.status,onChange:ev=>setItems(p=>p.map((q,i)=>i===idx?{...q,status:ev.target.value}:q))},
-            e(F,null,
-              e("option",{value:"OK"},"OK"),
-              e("option",{value:"Avvik"},"Avvik"),
-              e("option",{value:"NA"},"NA")
-            )
-          )
+          e(StatusBoxes,{
+            name:`st-${idx}`,
+            value:it.status,
+            onChange:(v)=>setItems(p=>p.map((q,i)=>i===idx?{...q,status:v}:q))
+          })
         )),
         e("div",{style:{display:"flex",gap:8,marginTop:10}},
           e(BtnSec,{onClick:()=>setView("customerDetail")},"Avbryt"),
@@ -341,13 +375,13 @@
 
       const [cust,setCust]=React.useState({name:"",contact:"",phone:"",email:"",orgnr:"",street:"",zip:"",city:""});
       const [ind,setInd]=React.useState({name:"",type:"",serial:"",notes:""});
-      const [check,setCheck]=React.useState({date:today(),inspector:"",result:"OK",notes:""});
+      const [check,setCheck]=React.useState({date:today(),inspector:"Bjørn Petersson",result:"OK",notes:""}); // <-- default kontrollør + OK
       const [items,setItems]=React.useState([]);
       const [photo,setPhoto]=React.useState(null);
 
       const address=c=>[c.street,[c.zip,c.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
 
-      // SIKKERHETSNETT: hvis vi er på newCheck uten items, bygg dem nå
+      // Hvis vi er på newCheck uten items, bygg nå
       React.useEffect(()=>{
         if (view==="newCheck" && currentIndividual && (!items || items.length===0)) {
           const base=(CHECKLISTS[currentIndividual.type]||[]).map((label,i)=>({key:"k"+i,label,status:"OK",notes:""}));
@@ -414,7 +448,9 @@
       const startChecklist=(individual)=>{
         setCurrentIndividual(individual);
         const base=(CHECKLISTS[individual.type]||[]).map((label,i)=>({key:"k"+i,label,status:"OK",notes:""}));
-        setItems(base); setPhoto(null); setCheck({date:today(),inspector:"",result:"OK",notes:""}); setView("newCheck");
+        setItems(base); setPhoto(null);
+        setCheck({date:today(),inspector:"Bjørn Petersson",result:"OK",notes:""}); // default her også
+        setView("newCheck");
       };
       const saveCheck=()=>{
         const y={id:uid(),individualId:currentIndividual.id,photo:photo||null,...check,
@@ -433,9 +469,21 @@
         if(!jsPDF){ alert("jsPDF ikke lastet (CDN). Prøv å laste siden på nytt."); return; }
         const doc=new jsPDF({unit:"pt",format:"a4"});
         const margin=40,pageW=doc.internal.pageSize.getWidth(),pageH=doc.internal.pageSize.getHeight();
+        const centerX=pageW/2, centerY=pageH/2;
         let yPos=margin;
         const indiv=db.individuals.find(i=>i.id===y.individualId)||{};
         const cust=db.customers.find(c=>c.id===indiv.customerId)||{};
+
+        // VANNMERKE dersom underkjent
+        if ((y.result||"").toLowerCase()==="underkjent") {
+          doc.saveGraphicsState && doc.saveGraphicsState();
+          doc.setTextColor(220,0,0);
+          doc.setFontSize(80);
+          doc.text("UNDERKJENT", centerX, centerY, {angle:45, align:"center"});
+          doc.setFontSize(12);
+          doc.setTextColor(0,0,0);
+          doc.restoreGraphicsState && doc.restoreGraphicsState();
+        }
 
         doc.setFontSize(16); doc.text(`${cleanType(indiv.type||"Produkt")} – årskontroll`, margin, yPos); yPos+=26;
         doc.setFontSize(11);
@@ -471,7 +519,7 @@
 
         const rows=db.items.filter(i=>i.yearcheckId===y.id).map(r=>({punkt:r.label,status:r.status,notat:r.notes||""}));
         rows.forEach(r=>{
-          const isAvvik=String(r.status).toLowerCase()==="avvik";
+          const isAvvik=String(r.status).toLowerCase()==="anmerking";
           if(isAvvik) doc.setFillColor(255,235,238);
           doc.rect(margin, yPos, colW[0], 28, isAvvik?"FD":"S");
           doc.rect(margin+colW[0], yPos, colW[1], 28, isAvvik?"FD":"S");
